@@ -1,0 +1,41 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE files
+*.iml
+.idea/
+*.classpath
+*.project
+*.settings/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Others
+HELP.md
+
+# Node
+node_modules/
+bun.lockb
+
+# Build output
+dist/
+.vite/
+
+# IDE files
+*.iml
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
