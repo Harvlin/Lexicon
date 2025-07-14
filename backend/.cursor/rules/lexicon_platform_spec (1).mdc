@@ -1,0 +1,390 @@
+---
+alwaysApply: true
+---
+### 1. MVP (Minimum Viable Product)
+
+- **User Onboarding & Profile**: Sign up / Sign in, select role & goals.
+- **Micro‑Content Library**: Browse and consume video snippets, text lessons, and interactive code labs.
+- **Basic AI Study Tools**: Summarize any lesson, auto‑generate a quiz, and view flashcards.
+- **Progress Tracking**: Mark lessons complete, view streaks & badges.
+- **Recommendation Feed**: Role‑based trending lessons & AI‑suggested next content.
+
+---
+
+### 2. Core Features
+
+#### A. Micro‑Learning Content
+
+1. **Video Snippets** (AWS S3 / Cloudflare Stream)
+2. **Text Lessons** (Markdown / HTML)
+3. **Interactive Code Labs** (Monaco/React IDE)
+4. **Cheat Sheets** (PDF/Infographics)
+5. **Search & Filters** by topic, duration, format
+
+#### B. AI‑Driven Study Tools
+
+1. **Summarization Service**
+   - LLM (BART/T5 or GPT‑4) generates bullet‑point summaries of any lesson.
+2. **Quiz Generation**
+   - LLM prompts produce multiple‑choice and true/false quizzes per lesson.
+3. **Flashcards**
+   - Extract key terms and definitions, format as front/back.
+4. **Contextual Q&A Chatbot**
+   - Semantic search via embeddings + QA model (RoBERTa‑SQuAD) for on‑demand answers.
+5. **Personalized Study Plan**
+   - Given goals and deadlines, AI proposes calendar‑based plans with spaced‑repetition scheduling.
+
+#### C. Personalization & Recommendations
+
+- **Skill Gap Analysis**: ML model ingests user profile, quiz performance, and lesson history to identify gaps.
+- **Collaborative Filtering**: Suggest lessons consumed by similar users.
+- **Content‑Based Filtering**: Use lesson embeddings (Sentence‑Transformers) for similarity recommendations.
+- **Just‑in‑Time Notifications**: Integrate with calendar/Slack to push short daily lessons.
+
+#### D. Gamification & Progress Tracking
+
+- **Dashboard**: Streak counter and progress charts (React + Chart.js).
+- **Badges & Levels**: Awarded for completions, quizzes, streaks.
+- **Spaced Repetition Reminders**: Spring Scheduler sends email/push alerts.
+
+---
+
+### 3. Architecture & Data Flow
+
+```mermaid
+flowchart LR
+  subgraph User Device
+    A[Browser/Mobile App]
+  end
+  A -->|REST/GraphQL| B[Frontend (React/TS)]
+  B --> C[API Gateway]
+
+  subgraph Microservices
+    C --> D[Auth Service]
+    C --> E[Content Service]
+    C --> F[Study AI Service]
+    C --> G[Rec & Gap Analysis]
+    C --> H[Progress & Gamification]
+  end
+
+  subgraph Datastores
+    D --> M1[(MySQL)]
+    E --> M1
+    H --> M1
+    G --> Redis
+    F --> VectorDB[(FAISS/Weaviate)]
+  end
+
+  F -->|LLM API| OpenAI[(GPT‑4 API)]
+  F -->|Embeddings| VectorDB
+```
+
+1. **Content ingestion**: Admin uploads lesson assets → Content Service stores metadata in MySQL & files on S3.
+2. **User actions**: Browser calls API Gateway → routes to appropriate service.
+3. **Summarization/Quiz/Flashcards**: Frontend posts lesson\_id to Study AI Service → fetches content, calls LLM + embeddings → returns JSON.
+4. **Q&A**: User question + lesson\_id → Study AI Service retrieves top‑N chunks via VectorDB → QA model returns answer.
+5. **Recommendations**: Rec Service combines CF and content embeddings to serve `/recommendations`.
+6. **Progress**: Progress Service logs completions, updates streaks & badges, schedules reminders.
+
+---
+
+### 4. Development Phases
+
+#### Phase I: Backend Implementation
+
+1. **Project Setup & Configuration**
+   - Initialize Spring Boot monorepo with Maven/Gradle, configure Dockerfiles
+   - Set up MySQL schema and JPA entities for Users, Lessons, Quizzes, Flashcards, Progress, Badges, Embeddings
+   - Implement Authentication Service with Spring Security (JWT)
+2. **Content Service**
+   - CRUD endpoints for Lessons, Cheat Sheets, and Media metadata
+   - Integrate AWS S3 / Cloudflare SDK for file uploads
+3. **Study AI Service**
+   - Create a Python FastAPI microservice containerized in Docker
+   - Implement endpoints:
+     - `/summarize` (calls HuggingFace or GPT-4)
+     - `/generate-quiz`
+     - `/generate-flashcards`
+     - `/ask`
+     - `/study-plan`
+   - Set up FAISS index service to store and query embeddings
+4. **Recommendation & Gap Analysis Service**
+   - Collaborative filtering algorithm (Spring Boot + Python ML module)
+   - Content-based recommendations using embeddings via REST
+   - Cache recommendations in Redis
+5. **Progress & Gamification Service**
+   - Endpoints to record progress, compute streaks, award badges
+   - Scheduling with Spring Scheduler for spaced-repetition reminders
+6. **Integration & Testing**
+   - Write integration tests for each microservice
+   - Docker Compose file to orchestrate backend services locally
+
+#### Phase II: Frontend Implementation
+
+1. **UI Framework & Routing**
+   - Initialize React with TypeScript, Tailwind CSS, and React Router
+2. **Auth & Onboarding**
+   - Pages: Login, Register, Onboarding Wizard (role & goals)
+   - Integrate JWT token handling and API service layer
+3. **Library & Lesson Viewer**
+   - Pages: Library list, Lesson Detail (video player, text viewer, code lab)
+   - Tabbed AI tools (Summary, Quiz, Flashcards, Q&A) communicating with AI Service
+4. **Progress Dashboard & Gamification UI**
+   - Charts for streaks and completion stats (Chart.js)
+   - Badges display and detail modals
+5. **Recommendations & Study Plan**
+   - Home Dashboard with recommended lessons
+   - Study Plan page with calendar view and tasks
+6. **Chatbot Interface**
+   - Implement Q&A chat UI for lesson context
+7. **Admin Panel**
+   - Pages to manage Lessons, Users, and Badges
+8. **Responsive Design & Polish**
+   - Ensure mobile and desktop responsiveness
+   - Performance optimizations and final QA
+
+---
+
+### 5. Data Models & Entities (MySQL) Data Models & Entities (MySQL)
+
+| Entity        | Fields                                                                   |
+| ------------- | ------------------------------------------------------------------------ |
+| **User**      | id, name, email, password\_hash, role, goals(json), created\_at          |
+| **Lesson**    | id, title, type(enum), content\_url, duration, topics(json), created\_at |
+| **Embedding** | id, lesson\_id, vector(blob)                                             |
+| **Quiz**      | id, lesson\_id, questions(json), created\_at                             |
+| **Flashcard** | id, lesson\_id, term, definition, example                                |
+| **Progress**  | id, user\_id, lesson\_id, status(enum), completed\_at                    |
+| **Badge**     | id, name, description, criteria(json)                                    |
+| **UserBadge** | user\_id, badge\_id, awarded\_at                                         |
+| **Reminder**  | id, user\_id, lesson\_id, remind\_at, sent(boolean)                      |
+
+---
+
+### 6. API Endpoints (with Descriptions)
+
+#### Auth
+
+- `POST /api/auth/register` ⇒ {name, email, password, role, goals}
+- `POST /api/auth/login` ⇒ {email, password} → JWT
+- `GET /api/auth/me` ⇒ current user
+
+#### Users
+
+- `PUT /api/users/me` ⇒ update role & goals
+
+#### Lessons
+
+- `GET /api/lessons?filter...` ⇒ list
+- `GET /api/lessons/:id` ⇒ detail
+- `POST /api/lessons` (admin) ⇒ create
+- `PUT /api/lessons/:id` (admin) ⇒ update
+
+#### Study AI Service
+
+- `POST /api/ai/summarize` ⇒ {lesson\_id} → summary text
+- `POST /api/ai/generate-quiz` ⇒ {lesson\_id} → quiz JSON
+- `POST /api/ai/generate-flashcards` ⇒ {lesson\_id} → list of cards
+- `POST /api/ai/ask` ⇒ {lesson\_id, question} → answer + source refs
+- `POST /api/ai/study-plan` ⇒ {goals, deadlines, availability} → schedule JSON
+
+#### Progress & Gamification
+
+- `POST /api/progress` ⇒ {lesson\_id, status}
+- `GET /api/progress/stats` ⇒ user stats
+- `GET /api/users/me/badges` ⇒ badges
+
+#### Recommendations
+
+- `GET /api/recommendations` ⇒ personalized list
+
+#### Reminders
+
+- `GET /api/reminders`
+- `POST /api/reminders` ⇒ create or reschedule
+
+---
+
+### 7. Backend Services & Interfaces
+
+Below is a breakdown of Spring Boot service interfaces and their implementing classes, with core methods and responsibilities:
+
+#### 7.1 AuthService
+
+**Interface:** `AuthService`
+
+```java
+String register(RegisterDto dto);
+AuthResponse login(LoginDto dto);
+UserDto getCurrentUser();
+void updateProfile(UpdateProfileDto dto);
+```
+
+**Impl:** `AuthServiceImpl`
+
+- `register(...)` → validate, save user, return confirmation
+- `login(...)` → authenticate via AuthenticationManager, generate JWT
+- `getCurrentUser()` → fetch user from SecurityContext
+- `updateProfile(...)` → update role & goals
+
+#### 7.2 LessonService
+
+**Interface:** `LessonService`
+
+```java
+List<LessonDto> listLessons(LessonFilter filter);
+LessonDto getLessonById(Long id);
+LessonDto createLesson(CreateLessonDto dto);
+LessonDto updateLesson(Long id, UpdateLessonDto dto);
+void deleteLesson(Long id);
+```
+
+**Impl:** `LessonServiceImpl`
+
+- CRUD lesson metadata, S3 upload via `StorageClient`
+
+#### 7.3 QuizService
+
+**Interface:** `QuizService`
+
+```java
+QuizDto generateQuiz(Long lessonId);
+QuizDto getQuizByLesson(Long lessonId);
+void submitQuizResponse(Long quizId, QuizResponseDto response);
+QuizStatsDto getQuizStats(Long userId);
+```
+
+**Impl:** `QuizServiceImpl`
+
+- Calls AI client to generate quiz
+- Stores and retrieves quiz data and user responses
+
+#### 7.4 FlashcardService
+
+**Interface:** `FlashcardService`
+
+```java
+List<FlashcardDto> generateFlashcards(Long lessonId);
+List<FlashcardDto> getFlashcardsByLesson(Long lessonId);
+void submitFlashcardReview(Long cardId, ReviewDto review);
+```
+
+**Impl:** `FlashcardServiceImpl`
+
+- Calls AI client for generation, manages review logs
+
+#### 7.5 SummarizationService
+
+**Interface:** `SummarizationService`
+
+```java
+SummaryDto summarizeLesson(Long lessonId);
+```
+
+**Impl:** `SummarizationServiceImpl`
+
+- Invokes Python AI microservice `/summarize` endpoint
+
+#### 7.6 QnAService
+
+**Interface:** `QnAService`
+
+```java
+AnswerDto answerQuestion(Long lessonId, String question);
+```
+
+**Impl:** `QnAServiceImpl`
+
+- Fetch lesson embeddings, call Python `/ask` microservice
+
+#### 7.7 StudyPlanService
+
+**Interface:** `StudyPlanService`
+
+```java
+StudyPlanDto generatePlan(StudyPlanRequestDto request);
+StudyPlanDto getPlanByUser(Long userId);
+```
+
+**Impl:** `StudyPlanServiceImpl`
+
+- Calls Python `/study-plan` endpoint, persists plan
+
+#### 7.8 RecommendationService
+
+**Interface:** `RecommendationService`
+
+```java
+List<LessonDto> recommendLessons(Long userId);
+```
+
+**Impl:** `RecommendationServiceImpl`
+
+- Combines CF & content-based recommendations, caches in Redis
+
+#### 7.9 ProgressService
+
+**Interface:** `ProgressService`
+
+```java
+void recordProgress(Long userId, Long lessonId, ProgressStatus status);
+ProgressStatsDto getProgressStats(Long userId);
+List<ProgressDto> getUserProgress(Long userId);
+```
+
+**Impl:** `ProgressServiceImpl`
+
+- Manages streaks, badge awarding, schedules reminders via Spring Scheduler
+
+#### 7.10 BadgeService
+
+**Interface:** `BadgeService`
+
+```java
+List<BadgeDto> listAllBadges();
+List<BadgeDto> getUserBadges(Long userId);
+BadgeDto createBadge(CreateBadgeDto dto);
+```
+
+**Impl:** `BadgeServiceImpl`
+
+- Badge creation and assignment logic
+
+#### 7.11 StorageClient (Utility)
+
+```java
+String uploadFile(MultipartFile file, String path);
+Resource downloadFile(String path);
+```
+
+---
+
+### 8. Frontend Page List
+
+1. **Auth Pages**: Login, Register, Onboarding (role & goals) ... Frontend Page List
+
+2. **Auth Pages**: Login, Register, Onboarding (role & goals)
+
+3. **Home Dashboard**: Hero, recommended lessons, quick actions
+
+4. **Library**: Filters & search UI
+
+5. **Lesson Viewer**: Video/text/lab + tabbed AI tools (Summary, Quiz, Flashcards, Q&A)
+
+6. **Quiz Page/Modal**: Take quizzes & view scores
+
+7. **Flashcards Page**: Review decks with spaced-rep timing
+
+8. **Q&A Chatbot**: Chat interface for lesson context
+
+9. **Study Plan**: Calendar view with task list
+
+10. **Progress Dashboard**: Streaks chart, badges, stats
+
+11. **Profile Settings**
+
+12. **Admin Panel**: Manage lessons, users, badges
+
+---
+
+With this unified spec, Lexicon merges micro‑learning and AI study‑assistant capabilities end‑to‑end. Let me know if you need detailed code examples for any endpoint or component!

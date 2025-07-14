@@ -1,0 +1,16 @@
+version: '3.1'
+
+services:
+  db:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: passwordindevelopment!
+      MYSQL_DATABASE: lexicon
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - 8888:8080
