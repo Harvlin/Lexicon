@@ -1,422 +1,332 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Search, 
-  Filter, 
-  Clock, 
+  Grid3X3, 
+  List, 
   Play, 
+  Clock, 
+  Star, 
   BookOpen, 
   Code, 
-  Video, 
   FileText,
-  Star,
   TrendingUp,
-  Users,
-  Grid3X3,
-  List,
-  SlidersHorizontal
+  Filter
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { MockAPI, type Lesson } from "@/utils/mockApi";
 
-export default function Library() {
-  const navigate = useNavigate();
+const LibraryPage = () => {
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedDifficulty, setSelectedDifficulty] = useState("all");
-  const [selectedDuration, setSelectedDuration] = useState("all");
+  const [filters, setFilters] = useState({
+    category: "All",
+    level: "All",
+    type: "All",
+    sort: "popularity"
+  });
 
-  // Mock data - replace with actual API calls
-  const lessons = [
-    {
-      id: 1,
-      title: "React Hooks Fundamentals",
-      description: "Master the core hooks in React including useState, useEffect, and custom hooks",
-      type: "video",
-      duration: "14 min",
-      difficulty: "Beginner",
-      category: "Frontend",
-      tags: ["React", "JavaScript", "Hooks"],
-      rating: 4.8,
-      students: 1234,
-      thumbnail: "/api/placeholder/300/200",
-      instructor: "Sarah Chen",
-      lessonType: "video"
-    },
-    {
-      id: 2,
-      title: "Python Data Structures Deep Dive",
-      description: "Comprehensive guide to lists, dictionaries, sets, and tuples in Python",
-      type: "text",
-      duration: "10 min",
-      difficulty: "Intermediate",
-      category: "Backend",
-      tags: ["Python", "Data Structures"],
-      rating: 4.7,
-      students: 892,
-      thumbnail: "/api/placeholder/300/200",
-      instructor: "Mike Rodriguez",
-      lessonType: "text"
-    },
-    {
-      id: 3,
-      title: "Docker Container Lab",
-      description: "Hands-on practice with Docker containers, images, and orchestration",
-      type: "lab",
-      duration: "20 min",
-      difficulty: "Advanced",
-      category: "DevOps",
-      tags: ["Docker", "Containers", "DevOps"],
-      rating: 4.9,
-      students: 567,
-      thumbnail: "/api/placeholder/300/200",
-      instructor: "Alex Thompson",
-      lessonType: "lab"
-    },
-    {
-      id: 4,
-      title: "UI/UX Design Principles",
-      description: "Learn the fundamental principles of user interface and experience design",
-      type: "video",
-      duration: "16 min",
-      difficulty: "Beginner",
-      category: "Design",
-      tags: ["UI", "UX", "Design"],
-      rating: 4.6,
-      students: 2156,
-      thumbnail: "/api/placeholder/300/200",
-      instructor: "Emma Davis",
-      lessonType: "video"
-    },
-    {
-      id: 5,
-      title: "SQL Query Optimization",
-      description: "Advanced techniques for optimizing database queries and improving performance",
-      type: "text",
-      duration: "12 min",
-      difficulty: "Advanced",
-      category: "Database",
-      tags: ["SQL", "Database", "Performance"],
-      rating: 4.8,
-      students: 789,
-      thumbnail: "/api/placeholder/300/200",
-      instructor: "John Smith",
-      lessonType: "text"
-    },
-    {
-      id: 6,
-      title: "Machine Learning Basics",
-      description: "Introduction to machine learning concepts and practical applications",
-      type: "video",
-      duration: "18 min",
-      difficulty: "Beginner",
-      category: "AI/ML",
-      tags: ["Machine Learning", "Python", "AI"],
-      rating: 4.7,
-      students: 1567,
-      thumbnail: "/api/placeholder/300/200",
-      instructor: "Dr. Lisa Wang",
-      lessonType: "video"
-    }
-  ];
+  useEffect(() => {
+    loadLessons();
+  }, [filters]);
 
-  const categories = ["all", "Frontend", "Backend", "DevOps", "Design", "Database", "AI/ML"];
-  const difficulties = ["all", "Beginner", "Intermediate", "Advanced"];
-  const durations = ["all", "5-10 min", "10-15 min", "15+ min"];
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'video': return Video;
-      case 'text': return FileText;
-      case 'lab': return Code;
-      default: return BookOpen;
-    }
-  };
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Beginner': return 'bg-green-500/10 text-green-500';
-      case 'Intermediate': return 'bg-yellow-500/10 text-yellow-500';
-      case 'Advanced': return 'bg-red-500/10 text-red-500';
-      default: return 'bg-muted text-muted-foreground';
+  const loadLessons = async () => {
+    try {
+      setLoading(true);
+      const data = await MockAPI.getLessons({
+        category: filters.category !== "All" ? filters.category : undefined,
+        level: filters.level !== "All" ? filters.level : undefined,
+        type: filters.type !== "All" ? filters.type : undefined,
+      });
+      setLessons(data);
+    } catch (error) {
+      console.error("Failed to load lessons:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const filteredLessons = lessons.filter(lesson => {
     const matchesSearch = lesson.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lesson.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lesson.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = selectedCategory === "all" || lesson.category === selectedCategory;
-    const matchesDifficulty = selectedDifficulty === "all" || lesson.difficulty === selectedDifficulty;
-    // For duration filter, you'd implement proper logic based on actual duration values
-    return matchesSearch && matchesCategory && matchesDifficulty;
+                         lesson.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = 
+      selectedCategory === "All" || 
+      (selectedCategory === "Videos" && lesson.type === "video") ||
+      (selectedCategory === "Articles" && lesson.type === "article") ||
+      (selectedCategory === "Labs" && lesson.type === "lab") ||
+      (selectedCategory === "Trending" && lesson.trending);
+    
+    return matchesSearch && matchesCategory;
   });
 
-  const LessonCard = ({ lesson, compact = false }: { lesson: any, compact?: boolean }) => {
-    const TypeIcon = getTypeIcon(lesson.type);
-    
-    if (compact) {
-      return (
-        <div className={`lesson-card lesson-${lesson.lessonType} group cursor-pointer`} onClick={() => navigate(`/lesson/${lesson.id}`)}>
-          <div className="flex items-center space-x-4">
-            <div className={`w-16 h-16 rounded-lg bg-lesson-${lesson.lessonType}/10 flex items-center justify-center flex-shrink-0`}>
-              <TypeIcon className={`h-8 w-8 text-lesson-${lesson.lessonType}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold group-hover:text-primary transition-colors truncate">{lesson.title}</h3>
-              <p className="text-sm text-muted-foreground line-clamp-2">{lesson.description}</p>
-              <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
-                <div className="flex items-center">
-                  <Clock className="h-3 w-3 mr-1" />
-                  {lesson.duration}
-                </div>
-                <div className="flex items-center">
-                  <Star className="h-3 w-3 mr-1 text-yellow-500" />
-                  {lesson.rating}
-                </div>
-                <div className="flex items-center">
-                  <Users className="h-3 w-3 mr-1" />
-                  {lesson.students}
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col items-end space-y-2">
-              <Badge variant="secondary" className={getDifficultyColor(lesson.difficulty)}>
-                {lesson.difficulty}
-              </Badge>
-              <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <Play className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
-    }
+  const featuredLessons = lessons.filter(lesson => lesson.featured);
 
-    return (
-      <div className={`lesson-card lesson-${lesson.lessonType} group cursor-pointer`} onClick={() => navigate(`/lesson/${lesson.id}`)}>
-        <div className="aspect-video bg-muted rounded-lg mb-4 relative overflow-hidden">
-          <div className={`absolute inset-0 bg-lesson-${lesson.lessonType}/20 flex items-center justify-center`}>
-            <TypeIcon className={`h-12 w-12 text-lesson-${lesson.lessonType}`} />
-          </div>
-          <div className="absolute top-2 right-2">
-            <Badge variant="secondary" className="bg-background/80 text-foreground">
-              {lesson.duration}
-            </Badge>
-          </div>
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Button variant="ghost" size="lg" className="text-white hover:bg-white/20">
-              <Play className="h-8 w-8" />
-            </Button>
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex items-start justify-between">
-            <h3 className="font-semibold group-hover:text-primary transition-colors line-clamp-2">
-              {lesson.title}
-            </h3>
-            <Badge variant="secondary" className={getDifficultyColor(lesson.difficulty)}>
-              {lesson.difficulty}
-            </Badge>
-          </div>
-          
-          <p className="text-sm text-muted-foreground line-clamp-2">{lesson.description}</p>
-          
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>by {lesson.instructor}</span>
-            <div className="flex items-center space-x-2">
-              <Star className="h-3 w-3 text-yellow-500" />
-              <span>{lesson.rating}</span>
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap gap-1">
-            {lesson.tags.slice(0, 3).map((tag: string, index: number) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "video": return <Play className="h-4 w-4" />;
+      case "article": return <FileText className="h-4 w-4" />;
+      case "lab": return <Code className="h-4 w-4" />;
+      default: return <BookOpen className="h-4 w-4" />;
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Learning Library</h1>
-            <p className="text-muted-foreground mt-1">Discover and learn from our curated collection</p>
+  const LessonCard = ({ lesson, featured = false }: { lesson: Lesson, featured?: boolean }) => (
+    <Link to={`/lesson/${lesson.id}`} className="block">
+      <Card className={`group hover:shadow-lg transition-all duration-300 cursor-pointer ${featured ? 'border-accent/30' : ''}`}>
+      <CardHeader className="p-0">
+        <div className="relative overflow-hidden rounded-t-lg">
+          <div className="h-48 bg-gradient-card flex items-center justify-center">
+            <div className="text-6xl opacity-20">
+              {getTypeIcon(lesson.type)}
+            </div>
           </div>
-        </div>
+          
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+          
+          <div className="absolute top-3 left-3">
+            <Badge variant="secondary" className="capitalize">
+              {getTypeIcon(lesson.type)}
+              <span className="ml-1">{lesson.type}</span>
+            </Badge>
+          </div>
+          
+          <div className="absolute top-3 right-3">
+            <Badge variant="outline" className="bg-background/80">
+              <Clock className="h-3 w-3 mr-1" />
+              {lesson.duration} min
+            </Badge>
+          </div>
 
-        {/* Search and Filters */}
-        <Card className="lesson-card">
-          <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search lessons, topics, or technologies..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+          {(lesson.featured || lesson.trending) && (
+            <div className="absolute bottom-3 left-3 flex gap-2">
+              {lesson.featured && (
+                <Badge className="bg-accent/90 text-accent-foreground">
+                  Featured
+                </Badge>
+              )}
+              {lesson.trending && (
+                <Badge className="bg-warning/90 text-warning-foreground">
+                  <TrendingUp className="h-3 w-3 mr-1" />
+                  Trending
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      
+      <CardContent className="p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold group-hover:text-accent transition-colors line-clamp-2">
+            {lesson.title}
+          </h3>
+          <p className="text-sm text-muted-foreground">by {lesson.author}</p>
+        </div>
+        
+        <p className="text-sm text-muted-foreground line-clamp-2">
+          {lesson.description}
+        </p>
+        
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center">
+              <Star className="h-4 w-4 text-warning fill-current" />
+              <span className="ml-1">{lesson.rating}</span>
+            </div>
+            <span className="text-muted-foreground">•</span>
+            <span className="text-muted-foreground">{lesson.students} students</span>
+          </div>
+          
+          <Badge variant="outline" className="text-xs">
+            {lesson.level}
+          </Badge>
+        </div>
+      </CardContent>
+    </Card>
+  </Link>
+  );
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      
+      <main className="py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="text-center space-y-4 mb-12">
+            <h1 className="text-3xl md:text-4xl font-bold">
+              Learning Library
+            </h1>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              Discover thousands of bite-sized lessons designed to fit your schedule and learning style
+            </p>
+          </div>
+
+          {/* Featured Section */}
+          {featuredLessons.length > 0 && (
+            <div className="mb-12">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold">Featured Lessons</h2>
+                <Button variant="outline">View All Featured</Button>
               </div>
               
-              <div className="flex gap-3">
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {featuredLessons.map(lesson => (
+                  <LessonCard key={lesson.id} lesson={lesson} featured />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Search and Filter Bar */}
+          <div className="bg-card rounded-xl p-6 mb-8 border border-border/50">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search lessons, topics, or instructors..." 
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Select value={filters.category} onValueChange={(value) => setFilters({...filters, category: value})}>
                   <SelectTrigger className="w-40">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category === "all" ? "All Categories" : category}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="All">All Categories</SelectItem>
+                    <SelectItem value="Frontend">Frontend</SelectItem>
+                    <SelectItem value="Backend">Backend</SelectItem>
+                    <SelectItem value="Cloud">Cloud</SelectItem>
+                    <SelectItem value="AI/ML">AI/ML</SelectItem>
                   </SelectContent>
                 </Select>
 
-                <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Difficulty" />
+                <Select value={filters.level} onValueChange={(value) => setFilters({...filters, level: value})}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder="Level" />
                   </SelectTrigger>
                   <SelectContent>
-                    {difficulties.map((difficulty) => (
-                      <SelectItem key={difficulty} value={difficulty}>
-                        {difficulty === "all" ? "All Levels" : difficulty}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="All">All Levels</SelectItem>
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
                   </SelectContent>
                 </Select>
 
-                <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {durations.map((duration) => (
-                      <SelectItem key={duration} value={duration}>
-                        {duration === "all" ? "Any Duration" : duration}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <div className="flex border rounded-md">
-                  <Button
+                <div className="flex border rounded-lg overflow-hidden">
+                  <Button 
                     variant={viewMode === "grid" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setViewMode("grid")}
-                    className="rounded-r-none"
                   >
                     <Grid3X3 className="h-4 w-4" />
                   </Button>
-                  <Button
+                  <Button 
                     variant={viewMode === "list" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setViewMode("list")}
-                    className="rounded-l-none"
                   >
                     <List className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Content Tabs */}
-        <Tabs defaultValue="all" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto">
-            <TabsTrigger value="all" className="flex items-center">
-              <BookOpen className="h-4 w-4 mr-2" />
-              All
-            </TabsTrigger>
-            <TabsTrigger value="video" className="flex items-center">
-              <Video className="h-4 w-4 mr-2" />
-              Videos
-            </TabsTrigger>
-            <TabsTrigger value="text" className="flex items-center">
-              <FileText className="h-4 w-4 mr-2" />
-              Articles
-            </TabsTrigger>
-            <TabsTrigger value="lab" className="flex items-center">
-              <Code className="h-4 w-4 mr-2" />
-              Labs
-            </TabsTrigger>
-            <TabsTrigger value="trending" className="flex items-center">
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Trending
-            </TabsTrigger>
-          </TabsList>
+          {/* Category Tabs */}
+          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="mb-8">
+            <TabsList className="grid grid-cols-5 w-full max-w-md mx-auto">
+              {["All", "Videos", "Articles", "Labs", "Trending"].map(category => (
+                <TabsTrigger key={category} value={category} className="text-xs">
+                  {category}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
 
-          <TabsContent value="all" className="space-y-6">
-            <div className="flex justify-between items-center">
+          {/* Results */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
               <p className="text-muted-foreground">
-                {filteredLessons.length} lessons found
+                Showing {filteredLessons.length} results
               </p>
             </div>
-            
-            {viewMode === "grid" ? (
+
+            {loading ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredLessons.map((lesson) => (
-                  <LessonCard key={lesson.id} lesson={lesson} />
+                {[...Array(8)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <div className="h-48 bg-muted rounded-t-lg" />
+                    <CardContent className="p-4 space-y-3">
+                      <div className="h-4 bg-muted rounded" />
+                      <div className="h-3 bg-muted rounded w-2/3" />
+                      <div className="h-3 bg-muted rounded w-1/2" />
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredLessons.map((lesson) => (
-                  <LessonCard key={lesson.id} lesson={lesson} compact />
+              <div className={`grid gap-6 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"}`}>
+                {filteredLessons.map(lesson => (
+                  <LessonCard key={lesson.id} lesson={lesson} />
                 ))}
               </div>
             )}
-          </TabsContent>
 
-          {/* Other tab contents would filter by type */}
-          <TabsContent value="video" className="space-y-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredLessons.filter(l => l.type === "video").map((lesson) => (
-                <LessonCard key={lesson.id} lesson={lesson} />
-              ))}
-            </div>
-          </TabsContent>
+            {!loading && filteredLessons.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No lessons found matching your criteria.</p>
+                <Button variant="outline" className="mt-4" onClick={() => {
+                  setSearchTerm("");
+                  setSelectedCategory("All");
+                  setFilters({
+                    category: "All",
+                    level: "All",
+                    type: "All",
+                    sort: "popularity"
+                  });
+                }}>
+                  Clear Filters
+                </Button>
+              </div>
+            )}
 
-          <TabsContent value="text" className="space-y-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredLessons.filter(l => l.type === "text").map((lesson) => (
-                <LessonCard key={lesson.id} lesson={lesson} />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="lab" className="space-y-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredLessons.filter(l => l.type === "lab").map((lesson) => (
-                <LessonCard key={lesson.id} lesson={lesson} />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="trending" className="space-y-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredLessons.slice(0, 8).map((lesson) => (
-                <LessonCard key={lesson.id} lesson={lesson} />
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+            {!loading && filteredLessons.length > 0 && (
+              <div className="text-center pt-8">
+                <Button variant="outline" size="lg">
+                  Load More Lessons
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+      
+      <Footer />
     </div>
   );
-}
+};
+
+export default LibraryPage;

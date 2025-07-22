@@ -1,341 +1,319 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   BookOpen, 
   Clock, 
-  Target, 
   Trophy, 
+  Target, 
+  Play, 
+  Star, 
   TrendingUp, 
-  Zap,
-  Play,
-  ArrowRight,
   Calendar,
-  Flame,
-  Star,
-  Code,
-  Video,
-  FileText
+  User,
+  Settings,
+  Award,
+  Zap
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-
-  // Mock user data - replace with actual API calls
-  const userData = {
-    name: "Alex Johnson",
-    streak: 7,
-    totalLessons: 45,
-    weeklyGoal: 5,
-    completedThisWeek: 3,
-    badges: 8,
-    level: "Intermediate",
-    xp: 2450
-  };
+  const [currentStreak, setCurrentStreak] = useState(12);
+  const [completedLessons, setCompletedLessons] = useState(47);
+  const [skillsProgress, setSkillsProgress] = useState(73);
 
   const recentActivity = [
-    { id: 1, title: "React Hooks Deep Dive", type: "video", duration: "12 min", completed: true, lessonType: "video" },
-    { id: 2, title: "Python Data Structures", type: "text", duration: "8 min", completed: true, lessonType: "text" },
-    { id: 3, title: "API Design Best Practices", type: "lab", duration: "15 min", completed: false, lessonType: "lab" },
+    { id: 1, type: "lesson", title: "React Hooks Fundamentals", completed: true, time: "2 hours ago" },
+    { id: 2, type: "quiz", title: "JavaScript ES6 Quiz", score: 85, time: "1 day ago" },
+    { id: 3, type: "lesson", title: "CSS Grid Layout", completed: true, time: "2 days ago" },
+    { id: 4, type: "achievement", title: "First Week Streak", time: "3 days ago" }
   ];
 
-  const recommendedLessons = [
-    { id: 1, title: "Advanced TypeScript Patterns", type: "video", duration: "14 min", difficulty: "Advanced", tags: ["TypeScript", "Programming"], lessonType: "video" },
-    { id: 2, title: "UI/UX Design Principles", type: "text", duration: "10 min", difficulty: "Beginner", tags: ["Design", "UX"], lessonType: "text" },
-    { id: 3, title: "Docker Container Optimization", type: "lab", duration: "18 min", difficulty: "Intermediate", tags: ["Docker", "DevOps"], lessonType: "lab" },
-    { id: 4, title: "Machine Learning Basics", type: "video", duration: "16 min", difficulty: "Beginner", tags: ["ML", "Python"], lessonType: "video" },
+  const currentLearningPath = [
+    { id: 1, title: "React Fundamentals", progress: 85, lessons: 12, completed: 10 },
+    { id: 2, title: "Advanced JavaScript", progress: 60, lessons: 15, completed: 9 },
+    { id: 3, title: "Node.js Basics", progress: 30, lessons: 10, completed: 3 }
   ];
 
-  const todaysPlan = [
-    { id: 1, title: "Complete React Native lesson", time: "9:00 AM", completed: true },
-    { id: 2, title: "Review flashcards: JavaScript", time: "2:00 PM", completed: false },
-    { id: 3, title: "Take quiz: Database Design", time: "6:00 PM", completed: false },
+  const upcomingLessons = [
+    { id: 1, title: "React State Management", duration: "8 min", difficulty: "Intermediate" },
+    { id: 2, title: "API Integration", duration: "12 min", difficulty: "Advanced" },
+    { id: 3, title: "Testing Fundamentals", duration: "6 min", difficulty: "Beginner" }
   ];
-
-  const achievements = [
-    { id: 1, title: "Week Warrior", description: "7-day learning streak", icon: Flame, earned: true },
-    { id: 2, title: "Code Master", description: "Completed 10 coding labs", icon: Code, earned: true },
-    { id: 3, title: "Knowledge Seeker", description: "Read 25 text lessons", icon: BookOpen, earned: false },
-    { id: 4, title: "Video Learner", description: "Watched 20 video lessons", icon: Video, earned: true },
-  ];
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'video': return Video;
-      case 'text': return FileText;
-      case 'lab': return Code;
-      default: return BookOpen;
-    }
-  };
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Beginner': return 'bg-green-500/10 text-green-500';
-      case 'Intermediate': return 'bg-yellow-500/10 text-yellow-500';
-      case 'Advanced': return 'bg-red-500/10 text-red-500';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Welcome back, {userData.name}! 👋</h1>
-            <p className="text-muted-foreground mt-1">Ready to continue your learning journey?</p>
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => navigate('/study-plan')}>
-              <Calendar className="h-4 w-4 mr-2" />
-              Study Plan
-            </Button>
-            <Button variant="learning" onClick={() => navigate('/library')}>
-              <BookOpen className="h-4 w-4 mr-2" />
-              Browse Library
-            </Button>
-          </div>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Welcome back, John!</h1>
+          <p className="text-muted-foreground mt-2">Continue your learning journey</p>
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="lesson-card">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Learning Streak</p>
-                  <p className="text-2xl font-bold flex items-center">
-                    {userData.streak}
-                    <Flame className="h-5 w-5 text-orange-500 ml-1" />
-                  </p>
+              <div className="flex items-center space-x-4">
+                <div className="p-2 bg-accent/20 rounded-lg">
+                  <BookOpen className="h-6 w-6 text-accent" />
                 </div>
-                <div className="w-12 h-12 bg-orange-500/10 rounded-full flex items-center justify-center">
-                  <Flame className="h-6 w-6 text-orange-500" />
+                <div>
+                  <p className="text-2xl font-bold">{completedLessons}</p>
+                  <p className="text-sm text-muted-foreground">Lessons Completed</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="lesson-card">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Lessons</p>
-                  <p className="text-2xl font-bold">{userData.totalLessons}</p>
+              <div className="flex items-center space-x-4">
+                <div className="p-2 bg-primary/20 rounded-lg">
+                  <Target className="h-6 w-6 text-primary" />
                 </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                  <BookOpen className="h-6 w-6 text-primary" />
+                <div>
+                  <p className="text-2xl font-bold">{currentStreak}</p>
+                  <p className="text-sm text-muted-foreground">Day Streak</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="lesson-card">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">This Week</p>
-                  <p className="text-2xl font-bold">{userData.completedThisWeek}/{userData.weeklyGoal}</p>
+              <div className="flex items-center space-x-4">
+                <div className="p-2 bg-success/20 rounded-lg">
+                  <Trophy className="h-6 w-6 text-success" />
                 </div>
-                <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center">
-                  <Target className="h-6 w-6 text-accent" />
+                <div>
+                  <p className="text-2xl font-bold">{skillsProgress}%</p>
+                  <p className="text-sm text-muted-foreground">Skills Progress</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="lesson-card">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Badges Earned</p>
-                  <p className="text-2xl font-bold">{userData.badges}</p>
+              <div className="flex items-center space-x-4">
+                <div className="p-2 bg-warning/20 rounded-lg">
+                  <Zap className="h-6 w-6 text-warning" />
                 </div>
-                <div className="w-12 h-12 bg-warning/10 rounded-full flex items-center justify-center">
-                  <Trophy className="h-6 w-6 text-warning" />
+                <div>
+                  <p className="text-2xl font-bold">156</p>
+                  <p className="text-sm text-muted-foreground">XP Points</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Weekly Progress */}
-            <Card className="lesson-card">
+            {/* Continue Learning */}
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="h-5 w-5 mr-2 text-primary" />
-                  Weekly Progress
+                <CardTitle className="flex items-center space-x-2">
+                  <Play className="h-5 w-5" />
+                  <span>Continue Learning</span>
                 </CardTitle>
                 <CardDescription>
-                  {userData.completedThisWeek} of {userData.weeklyGoal} lessons completed this week
+                  Pick up where you left off
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Progress value={(userData.completedThisWeek / userData.weeklyGoal) * 100} className="mb-4" />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>{userData.completedThisWeek} completed</span>
-                  <span>{userData.weeklyGoal - userData.completedThisWeek} remaining</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recommended Lessons */}
-            <Card className="lesson-card">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Zap className="h-5 w-5 mr-2 text-accent" />
-                    Recommended for You
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/library')}>
-                    View All <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
                 <div className="space-y-4">
-                  {recommendedLessons.map((lesson) => {
-                    const TypeIcon = getTypeIcon(lesson.type);
-                    return (
-                      <div key={lesson.id} className={`lesson-card lesson-${lesson.lessonType} group cursor-pointer`} onClick={() => navigate(`/lesson/${lesson.id}`)}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg bg-lesson-${lesson.lessonType}/10 flex items-center justify-center`}>
-                              <TypeIcon className={`h-5 w-5 text-lesson-${lesson.lessonType}`} />
-                            </div>
-                            <div>
-                              <h4 className="font-medium group-hover:text-primary transition-colors">{lesson.title}</h4>
-                              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                                <Clock className="h-3 w-3" />
-                                <span>{lesson.duration}</span>
-                                <span>•</span>
-                                <Badge variant="secondary" className={getDifficultyColor(lesson.difficulty)}>
-                                  {lesson.difficulty}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-3">
-                          {lesson.tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
+                  {currentLearningPath.map((path) => (
+                    <div key={path.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold">{path.title}</h3>
+                        <Badge variant="outline">{path.completed}/{path.lessons} lessons</Badge>
                       </div>
-                    );
-                  })}
+                      <Progress value={path.progress} className="mb-2" />
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{path.progress}% complete</span>
+                        <Button size="sm" variant="outline" asChild>
+                          <Link to={`/course/${path.id}`}>Continue</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Recent Activity */}
-            <Card className="lesson-card">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Clock className="h-5 w-5 mr-2 text-muted-foreground" />
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentActivity.map((activity) => {
-                    const TypeIcon = getTypeIcon(activity.type);
-                    return (
-                      <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/20">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 rounded-lg bg-lesson-${activity.lessonType}/10 flex items-center justify-center`}>
-                            <TypeIcon className={`h-4 w-4 text-lesson-${activity.lessonType}`} />
+            {/* Activity Tabs */}
+            <Tabs defaultValue="activity" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="activity">Recent Activity</TabsTrigger>
+                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                <TabsTrigger value="achievements">Achievements</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="activity" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Activity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {recentActivity.map((activity) => (
+                        <div key={activity.id} className="flex items-center space-x-4 p-3 border rounded-lg">
+                          <div className="p-2 bg-muted rounded-lg">
+                            {activity.type === "lesson" && <BookOpen className="h-4 w-4" />}
+                            {activity.type === "quiz" && <Target className="h-4 w-4" />}
+                            {activity.type === "achievement" && <Award className="h-4 w-4" />}
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <p className="font-medium">{activity.title}</p>
-                            <p className="text-sm text-muted-foreground">{activity.duration}</p>
+                            <p className="text-sm text-muted-foreground">{activity.time}</p>
                           </div>
+                          {activity.score && (
+                            <Badge variant="secondary">{activity.score}%</Badge>
+                          )}
                         </div>
-                        {activity.completed ? (
-                          <Badge variant="secondary" className="bg-success/10 text-success">
-                            Completed
-                          </Badge>
-                        ) : (
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/lesson/${activity.id}`)}>
-                            Continue
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="upcoming" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Upcoming Lessons</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {upcomingLessons.map((lesson) => (
+                        <div key={lesson.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{lesson.title}</p>
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>{lesson.duration}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {lesson.difficulty}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Button size="sm" asChild>
+                            <Link to={`/lesson/${lesson.id}`}>Start</Link>
                           </Button>
-                        )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="achievements" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Achievements</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 border rounded-lg text-center">
+                        <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <Trophy className="h-6 w-6 text-accent" />
+                        </div>
+                        <h3 className="font-semibold">First Week</h3>
+                        <p className="text-sm text-muted-foreground">Complete 7 days in a row</p>
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                      <div className="p-4 border rounded-lg text-center">
+                        <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <Star className="h-6 w-6 text-primary" />
+                        </div>
+                        <h3 className="font-semibold">Quick Learner</h3>
+                        <p className="text-sm text-muted-foreground">Complete 50 lessons</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Today's Plan */}
-            <Card className="lesson-card">
+            {/* Learning Goals */}
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-primary" />
-                  Today's Plan
+                <CardTitle className="flex items-center space-x-2">
+                  <Target className="h-5 w-5" />
+                  <span>Learning Goals</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {todaysPlan.map((task) => (
-                    <div key={task.id} className="flex items-center space-x-3">
-                      <div className={`w-4 h-4 rounded-full border-2 ${task.completed ? 'bg-success border-success' : 'border-muted-foreground'}`} />
-                      <div className="flex-1">
-                        <p className={`text-sm ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                          {task.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{task.time}</p>
-                      </div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Daily Goal</span>
+                      <span className="text-sm text-muted-foreground">2/3 lessons</span>
                     </div>
-                  ))}
+                    <Progress value={67} />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Weekly Goal</span>
+                      <span className="text-sm text-muted-foreground">12/15 lessons</span>
+                    </div>
+                    <Progress value={80} />
+                  </div>
                 </div>
-                <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/study-plan')}>
-                  View Full Plan
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button className="w-full justify-start" variant="outline" asChild>
+                  <Link to="/library">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Browse Library
+                  </Link>
+                </Button>
+                <Button className="w-full justify-start" variant="outline" asChild>
+                  <Link to="/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    View Profile
+                  </Link>
+                </Button>
+                <Button className="w-full justify-start" variant="outline" asChild>
+                  <Link to="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
 
-            {/* Achievements */}
-            <Card className="lesson-card">
+            {/* Study Reminder */}
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Trophy className="h-5 w-5 mr-2 text-warning" />
-                  Recent Achievements
+                <CardTitle className="flex items-center space-x-2">
+                  <Calendar className="h-5 w-5" />
+                  <span>Study Reminder</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {achievements.slice(0, 3).map((achievement) => (
-                    <div key={achievement.id} className={`flex items-center space-x-3 p-2 rounded-lg ${achievement.earned ? 'bg-warning/10' : 'bg-muted/20'}`}>
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${achievement.earned ? 'bg-warning/20' : 'bg-muted/40'}`}>
-                        <achievement.icon className={`h-4 w-4 ${achievement.earned ? 'text-warning' : 'text-muted-foreground'}`} />
-                      </div>
-                      <div>
-                        <p className={`text-sm font-medium ${achievement.earned ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {achievement.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                      </div>
-                      {achievement.earned && <Star className="h-4 w-4 text-warning" />}
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/profile')}>
-                  View All Badges
+                <p className="text-sm text-muted-foreground mb-4">
+                  Don't break your streak! You've been learning for {currentStreak} days straight.
+                </p>
+                <Button className="w-full" size="sm">
+                  Continue Learning
                 </Button>
               </CardContent>
             </Card>
