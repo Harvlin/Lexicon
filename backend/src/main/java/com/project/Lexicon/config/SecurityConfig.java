@@ -50,7 +50,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/quiz/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN")
                         .requestMatchers("/api/flashcards/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN")
                         .requestMatchers("/api/progress/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN")
-                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                         .anyRequest().authenticated()
                 );
         http.exceptionHandling(ex -> ex

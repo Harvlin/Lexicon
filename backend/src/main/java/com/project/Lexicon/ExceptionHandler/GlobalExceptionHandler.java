@@ -1,6 +1,6 @@
 package com.project.Lexicon.ExceptionHandler;
 
-import com.project.Lexicon.domain.dto.ErrorResponse;
+import com.project.Lexicon.domain.dto.security.ErrorResponse;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

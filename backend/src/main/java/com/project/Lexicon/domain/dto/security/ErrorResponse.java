@@ -1,4 +1,4 @@
-package com.project.Lexicon.domain.dto;
+package com.project.Lexicon.domain.dto.security;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

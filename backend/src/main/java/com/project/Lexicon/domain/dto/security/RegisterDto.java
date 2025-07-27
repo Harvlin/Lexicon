@@ -1,4 +1,4 @@
-package com.project.Lexicon.domain.dto;
+package com.project.Lexicon.domain.dto.security;
 
 import com.project.Lexicon.domain.Role;
 import java.util.List;
@@ -22,14 +22,12 @@ public class RegisterDto {
     @NotNull(message = "Email is required")
     private String email;
 
-    @NotBlank(message = "Password is required")
+    @NotNull(message = "Password is required")
     private String password;
 
-    @NotBlank(message = "Role is required")
+    @NotNull(message = "Role is required")
     private Role role;
 
     @NotNull(message = "Goals list is required")
     private List<@NotBlank(message = "Each goal must be non-blank") String> goals;
-
-
 }

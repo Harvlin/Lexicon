@@ -1,4 +1,4 @@
-package com.project.Lexicon.domain.dto;
+package com.project.Lexicon.domain.dto.security;
 
 import com.project.Lexicon.domain.Role;
 import lombok.AllArgsConstructor;

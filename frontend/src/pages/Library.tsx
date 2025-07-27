@@ -1,332 +1,410 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  Search, 
-  Grid3X3, 
-  List, 
-  Play, 
-  Clock, 
-  Star, 
-  BookOpen, 
-  Code, 
-  FileText,
+  Search,
+  Filter,
+  Clock,
+  Star,
+  Play,
+  BookOpen,
+  Code,
+  Monitor,
+  Gamepad2,
+  Grid3X3,
+  List,
   TrendingUp,
-  Filter
-} from "lucide-react";
-import { MockAPI, type Lesson } from "@/utils/mockApi";
+  Calendar
+} from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
+import { mockLessons, Lesson } from '@/lib/mock-data';
 
-const LibraryPage = () => {
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [filters, setFilters] = useState({
-    category: "All",
-    level: "All",
-    type: "All",
-    sort: "popularity"
-  });
+const Library: React.FC = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedTopic, setSelectedTopic] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('newest');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  useEffect(() => {
-    loadLessons();
-  }, [filters]);
+  // Get all unique topics
+  const allTopics = useMemo(() => {
+    const topics = new Set<string>();
+    mockLessons.forEach(lesson => {
+      lesson.topics.forEach(topic => topics.add(topic));
+    });
+    return Array.from(topics);
+  }, []);
 
-  const loadLessons = async () => {
-    try {
-      setLoading(true);
-      const data = await MockAPI.getLessons({
-        category: filters.category !== "All" ? filters.category : undefined,
-        level: filters.level !== "All" ? filters.level : undefined,
-        type: filters.type !== "All" ? filters.type : undefined,
-      });
-      setLessons(data);
-    } catch (error) {
-      console.error("Failed to load lessons:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredLessons = lessons.filter(lesson => {
-    const matchesSearch = lesson.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lesson.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = 
-      selectedCategory === "All" || 
-      (selectedCategory === "Videos" && lesson.type === "video") ||
-      (selectedCategory === "Articles" && lesson.type === "article") ||
-      (selectedCategory === "Labs" && lesson.type === "lab") ||
-      (selectedCategory === "Trending" && lesson.trending);
-    
-    return matchesSearch && matchesCategory;
-  });
-
-  const featuredLessons = lessons.filter(lesson => lesson.featured);
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "video": return <Play className="h-4 w-4" />;
-      case "article": return <FileText className="h-4 w-4" />;
-      case "lab": return <Code className="h-4 w-4" />;
-      default: return <BookOpen className="h-4 w-4" />;
-    }
-  };
-
-  const LessonCard = ({ lesson, featured = false }: { lesson: Lesson, featured?: boolean }) => (
-    <Link to={`/lesson/${lesson.id}`} className="block">
-      <Card className={`group hover:shadow-lg transition-all duration-300 cursor-pointer ${featured ? 'border-accent/30' : ''}`}>
-      <CardHeader className="p-0">
-        <div className="relative overflow-hidden rounded-t-lg">
-          <div className="h-48 bg-gradient-card flex items-center justify-center">
-            <div className="text-6xl opacity-20">
-              {getTypeIcon(lesson.type)}
-            </div>
-          </div>
-          
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-          
-          <div className="absolute top-3 left-3">
-            <Badge variant="secondary" className="capitalize">
-              {getTypeIcon(lesson.type)}
-              <span className="ml-1">{lesson.type}</span>
-            </Badge>
-          </div>
-          
-          <div className="absolute top-3 right-3">
-            <Badge variant="outline" className="bg-background/80">
-              <Clock className="h-3 w-3 mr-1" />
-              {lesson.duration} min
-            </Badge>
-          </div>
-
-          {(lesson.featured || lesson.trending) && (
-            <div className="absolute bottom-3 left-3 flex gap-2">
-              {lesson.featured && (
-                <Badge className="bg-accent/90 text-accent-foreground">
-                  Featured
-                </Badge>
-              )}
-              {lesson.trending && (
-                <Badge className="bg-warning/90 text-warning-foreground">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  Trending
-                </Badge>
-              )}
-            </div>
-          )}
-        </div>
-      </CardHeader>
+  // Filter and sort lessons
+  const filteredLessons = useMemo(() => {
+    let filtered = mockLessons.filter(lesson => {
+      const matchesSearch = lesson.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           lesson.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           lesson.topics.some(topic => topic.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      <CardContent className="p-4 space-y-3">
-        <div>
-          <h3 className="font-semibold group-hover:text-accent transition-colors line-clamp-2">
-            {lesson.title}
-          </h3>
-          <p className="text-sm text-muted-foreground">by {lesson.author}</p>
-        </div>
-        
-        <p className="text-sm text-muted-foreground line-clamp-2">
-          {lesson.description}
-        </p>
-        
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center">
-              <Star className="h-4 w-4 text-warning fill-current" />
-              <span className="ml-1">{lesson.rating}</span>
-            </div>
-            <span className="text-muted-foreground">•</span>
-            <span className="text-muted-foreground">{lesson.students} students</span>
-          </div>
-          
-          <Badge variant="outline" className="text-xs">
-            {lesson.level}
-          </Badge>
-        </div>
-      </CardContent>
-    </Card>
-  </Link>
-  );
+      const matchesDifficulty = selectedDifficulty === 'all' || lesson.difficulty === selectedDifficulty;
+      const matchesType = selectedType === 'all' || lesson.type === selectedType;
+      const matchesTopic = selectedTopic === 'all' || lesson.topics.includes(selectedTopic);
+
+      return matchesSearch && matchesDifficulty && matchesType && matchesTopic;
+    });
+
+    // Sort lessons
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'rating':
+          return b.rating - a.rating;
+        case 'duration':
+          return a.duration - b.duration;
+        case 'title':
+          return a.title.localeCompare(b.title);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [searchQuery, selectedDifficulty, selectedType, selectedTopic, sortBy]);
+
+  const getTypeIcon = (type: Lesson['type']) => {
+    switch (type) {
+      case 'video':
+        return Play;
+      case 'text':
+        return BookOpen;
+      case 'code-lab':
+        return Code;
+      case 'interactive':
+        return Gamepad2;
+      default:
+        return BookOpen;
+    }
+  };
+
+  const getDifficultyColor = (difficulty: Lesson['difficulty']) => {
+    switch (difficulty) {
+      case 'beginner':
+        return 'bg-success/10 text-success border-success/20';
+      case 'intermediate':
+        return 'bg-warning/10 text-warning border-warning/20';
+      case 'advanced':
+        return 'bg-destructive/10 text-destructive border-destructive/20';
+      default:
+        return 'bg-secondary';
+    }
+  };
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setSelectedDifficulty('all');
+    setSelectedType('all');
+    setSelectedTopic('all');
+    setSortBy('newest');
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      
-      <main className="py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center space-y-4 mb-12">
-            <h1 className="text-3xl md:text-4xl font-bold">
-              Learning Library
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Discover thousands of bite-sized lessons designed to fit your schedule and learning style
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row md:items-center md:justify-between"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gradient-ai mb-2">Learning Library</h1>
+            <p className="text-muted-foreground">
+              Discover and learn from our comprehensive collection of lessons
             </p>
           </div>
+          <div className="mt-4 md:mt-0 flex items-center space-x-2">
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              {filteredLessons.length} lessons
+            </Badge>
+          </div>
+        </motion.div>
 
-          {/* Featured Section */}
-          {featuredLessons.length > 0 && (
-            <div className="mb-12">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Featured Lessons</h2>
-                <Button variant="outline">View All Featured</Button>
-              </div>
-              
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {featuredLessons.map(lesson => (
-                  <LessonCard key={lesson.id} lesson={lesson} featured />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Search and Filter Bar */}
-          <div className="bg-card rounded-xl p-6 mb-8 border border-border/50">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search lessons, topics, or instructors..." 
-                    className="pl-10"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
+        {/* Search and Filters */}
+        <Card className="card-gradient">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search lessons, topics, or keywords..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Select value={filters.category} onValueChange={(value) => setFilters({...filters, category: value})}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Category" />
+              {/* Filters */}
+              <div className="flex flex-wrap gap-4">
+                <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Difficulty" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="All">All Categories</SelectItem>
-                    <SelectItem value="Frontend">Frontend</SelectItem>
-                    <SelectItem value="Backend">Backend</SelectItem>
-                    <SelectItem value="Cloud">Cloud</SelectItem>
-                    <SelectItem value="AI/ML">AI/ML</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={filters.level} onValueChange={(value) => setFilters({...filters, level: value})}>
-                  <SelectTrigger className="w-36">
-                    <SelectValue placeholder="Level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Levels</SelectItem>
+                    <SelectItem value="all">All Levels</SelectItem>
                     <SelectItem value="beginner">Beginner</SelectItem>
                     <SelectItem value="intermediate">Intermediate</SelectItem>
                     <SelectItem value="advanced">Advanced</SelectItem>
                   </SelectContent>
                 </Select>
 
-                <div className="flex border rounded-lg overflow-hidden">
-                  <Button 
-                    variant={viewMode === "grid" ? "default" : "ghost"}
+                <Select value={selectedType} onValueChange={setSelectedType}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="code-lab">Code Lab</SelectItem>
+                    <SelectItem value="interactive">Interactive</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Topic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Topics</SelectItem>
+                    {allTopics.map((topic) => (
+                      <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="oldest">Oldest</SelectItem>
+                    <SelectItem value="rating">Rating</SelectItem>
+                    <SelectItem value="duration">Duration</SelectItem>
+                    <SelectItem value="title">Title</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button variant="outline" onClick={resetFilters}>
+                  <Filter className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+
+                <div className="flex ml-auto space-x-2">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setViewMode("grid")}
+                    onClick={() => setViewMode('grid')}
                   >
                     <Grid3X3 className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant={viewMode === "list" ? "default" : "ghost"}
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setViewMode("list")}
+                    onClick={() => setViewMode('list')}
                   >
                     <List className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Category Tabs */}
-          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="mb-8">
-            <TabsList className="grid grid-cols-5 w-full max-w-md mx-auto">
-              {["All", "Videos", "Articles", "Labs", "Trending"].map(category => (
-                <TabsTrigger key={category} value={category} className="text-xs">
-                  {category}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+        {/* Lessons Grid/List */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredLessons.map((lesson, index) => {
+                const TypeIcon = getTypeIcon(lesson.type);
+                return (
+                  <motion.div
+                    key={lesson.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    whileHover={{ y: -4 }}
+                  >
+                    <Link to={`/lesson/${lesson.id}`}>
+                      <Card className="card-gradient hover-lift hover:border-primary/30 transition-all duration-300 h-full">
+                        <div className="relative">
+                          <img
+                            src={lesson.thumbnail}
+                            alt={lesson.title}
+                            className="w-full h-48 object-cover rounded-t-lg"
+                          />
+                          <div className="absolute top-3 left-3">
+                            <Badge className={getDifficultyColor(lesson.difficulty)}>
+                              {lesson.difficulty}
+                            </Badge>
+                          </div>
+                          <div className="absolute top-3 right-3">
+                            <div className="bg-black/50 text-white px-2 py-1 rounded-md text-sm flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {lesson.duration}m
+                            </div>
+                          </div>
+                          <div className="absolute bottom-3 right-3">
+                            <div className="bg-primary/90 text-white p-2 rounded-full">
+                              <TypeIcon className="h-4 w-4" />
+                            </div>
+                          </div>
+                        </div>
+                        <CardContent className="p-4">
+                          <h3 className="font-semibold mb-2 line-clamp-2">{lesson.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
+                            {lesson.description}
+                          </p>
+                          
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-1">
+                              <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                              <span className="text-sm font-medium">{lesson.rating}</span>
+                              <span className="text-sm text-muted-foreground">
+                                ({lesson.views} views)
+                              </span>
+                            </div>
+                          </div>
 
-          {/* Results */}
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground">
-                Showing {filteredLessons.length} results
-              </p>
+                          {lesson.progress !== undefined && (
+                            <div className="mb-3">
+                              <div className="flex justify-between text-sm mb-1">
+                                <span>Progress</span>
+                                <span>{lesson.progress}%</span>
+                              </div>
+                              <Progress value={lesson.progress} className="h-2" />
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-1">
+                            {lesson.topics.slice(0, 3).map((topic) => (
+                              <Badge key={topic} variant="secondary" className="text-xs">
+                                {topic}
+                              </Badge>
+                            ))}
+                            {lesson.topics.length > 3 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{lesson.topics.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </motion.div>
+                );
+              })}
             </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredLessons.map((lesson, index) => {
+                const TypeIcon = getTypeIcon(lesson.type);
+                return (
+                  <motion.div
+                    key={lesson.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Link to={`/lesson/${lesson.id}`}>
+                      <Card className="card-gradient hover-lift hover:border-primary/30 transition-all duration-300">
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-4">
+                            <img
+                              src={lesson.thumbnail}
+                              alt={lesson.title}
+                              className="w-24 h-16 object-cover rounded-lg"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between mb-2">
+                                <h3 className="font-semibold text-lg">{lesson.title}</h3>
+                                <div className="flex items-center space-x-2">
+                                  <Badge className={getDifficultyColor(lesson.difficulty)}>
+                                    {lesson.difficulty}
+                                  </Badge>
+                                  <div className="bg-primary/10 text-primary p-2 rounded-lg">
+                                    <TypeIcon className="h-4 w-4" />
+                                  </div>
+                                </div>
+                              </div>
+                              <p className="text-muted-foreground mb-3 line-clamp-2">
+                                {lesson.description}
+                              </p>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                                  <span className="flex items-center">
+                                    <Clock className="h-4 w-4 mr-1" />
+                                    {lesson.duration} min
+                                  </span>
+                                  <span className="flex items-center">
+                                    <Star className="h-4 w-4 mr-1 text-yellow-500 fill-current" />
+                                    {lesson.rating}
+                                  </span>
+                                  <span>{lesson.views} views</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {lesson.topics.slice(0, 2).map((topic) => (
+                                    <Badge key={topic} variant="secondary" className="text-xs">
+                                      {topic}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              {lesson.progress !== undefined && (
+                                <div className="mt-3">
+                                  <Progress value={lesson.progress} className="h-2" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
 
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {[...Array(8)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <div className="h-48 bg-muted rounded-t-lg" />
-                    <CardContent className="p-4 space-y-3">
-                      <div className="h-4 bg-muted rounded" />
-                      <div className="h-3 bg-muted rounded w-2/3" />
-                      <div className="h-3 bg-muted rounded w-1/2" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className={`grid gap-6 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"}`}>
-                {filteredLessons.map(lesson => (
-                  <LessonCard key={lesson.id} lesson={lesson} />
-                ))}
-              </div>
-            )}
-
-            {!loading && filteredLessons.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No lessons found matching your criteria.</p>
-                <Button variant="outline" className="mt-4" onClick={() => {
-                  setSearchTerm("");
-                  setSelectedCategory("All");
-                  setFilters({
-                    category: "All",
-                    level: "All",
-                    type: "All",
-                    sort: "popularity"
-                  });
-                }}>
-                  Clear Filters
-                </Button>
-              </div>
-            )}
-
-            {!loading && filteredLessons.length > 0 && (
-              <div className="text-center pt-8">
-                <Button variant="outline" size="lg">
-                  Load More Lessons
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-      
-      <Footer />
+        {filteredLessons.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-12"
+          >
+            <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No lessons found</h3>
+            <p className="text-muted-foreground mb-4">
+              Try adjusting your search criteria or browse all lessons
+            </p>
+            <Button onClick={resetFilters}>Clear Filters</Button>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 };
 
-export default LibraryPage;
+export default Library;

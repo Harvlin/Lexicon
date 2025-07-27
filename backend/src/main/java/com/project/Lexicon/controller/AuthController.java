@@ -1,7 +1,8 @@
 package com.project.Lexicon.controller;
 
 import com.project.Lexicon.annotations.RateLimit;
-import com.project.Lexicon.domain.dto.*;
+import com.project.Lexicon.domain.dto.MessageResponse;
+import com.project.Lexicon.domain.dto.security.*;
 import com.project.Lexicon.service.AuthService;
 import jakarta.validation.ValidationException;
 import lombok.extern.slf4j.Slf4j;

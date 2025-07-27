@@ -1,320 +1,386 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Navbar } from "@/components/Navbar";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  BookOpen, 
-  Clock, 
-  Trophy, 
-  Target, 
-  Play, 
-  Star, 
-  TrendingUp, 
+import React, { useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { gsap } from 'gsap';
+import { Link } from 'react-router-dom';
+import {
+  BookOpen,
+  Trophy,
+  Flame,
+  Target,
+  Clock,
+  TrendingUp,
+  Star,
+  Play,
+  Brain,
+  Zap,
   Calendar,
-  User,
-  Settings,
-  Award,
-  Zap
-} from "lucide-react";
+  MessageCircle,
+  ArrowRight,
+  CheckCircle
+} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { mockLessons, getRandomLessons, getUserProgress, mockBadges } from '@/lib/mock-data';
 
-export default function Dashboard() {
-  const [currentStreak, setCurrentStreak] = useState(12);
-  const [completedLessons, setCompletedLessons] = useState(47);
-  const [skillsProgress, setSkillsProgress] = useState(73);
+const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
 
-  const recentActivity = [
-    { id: 1, type: "lesson", title: "React Hooks Fundamentals", completed: true, time: "2 hours ago" },
-    { id: 2, type: "quiz", title: "JavaScript ES6 Quiz", score: 85, time: "1 day ago" },
-    { id: 3, type: "lesson", title: "CSS Grid Layout", completed: true, time: "2 days ago" },
-    { id: 4, type: "achievement", title: "First Week Streak", time: "3 days ago" }
+  useEffect(() => {
+    const tl = gsap.timeline();
+
+    // Animate stats cards
+    tl.fromTo(
+      statsRef.current?.children,
+      { opacity: 0, y: 30, scale: 0.9 },
+      { 
+        opacity: 1, 
+        y: 0, 
+        scale: 1,
+        duration: 0.6,
+        stagger: 0.1,
+        ease: "back.out(1.7)"
+      }
+    );
+
+    // Animate content cards
+    tl.fromTo(
+      cardsRef.current?.children,
+      { opacity: 0, y: 40 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.5,
+        stagger: 0.15,
+        ease: "power2.out"
+      },
+      "-=0.3"
+    );
+
+    return () => {
+      tl.kill();
+    };
+  }, []);
+
+  const recommendedLessons = getRandomLessons(3);
+  const progress = getUserProgress();
+  const earnedBadges = mockBadges.filter(badge => badge.earnedAt);
+  const nextBadge = mockBadges.find(badge => !badge.earnedAt);
+
+  const stats = [
+    {
+      title: "Lessons Completed",
+      value: user?.stats.lessonsCompleted || 0,
+      icon: BookOpen,
+      color: "text-neural-blue",
+      bgColor: "bg-neural-blue/10"
+    },
+    {
+      title: "Current Streak",
+      value: `${user?.stats.streakDays || 0} days`,
+      icon: Flame,
+      color: "text-warning",
+      bgColor: "bg-warning/10"
+    },
+    {
+      title: "Total Points",
+      value: user?.stats.totalPoints || 0,
+      icon: Trophy,
+      color: "text-success",
+      bgColor: "bg-success/10"
+    },
+    {
+      title: "Level",
+      value: user?.stats.level || 1,
+      icon: Star,
+      color: "text-primary",
+      bgColor: "bg-primary/10"
+    }
   ];
 
-  const currentLearningPath = [
-    { id: 1, title: "React Fundamentals", progress: 85, lessons: 12, completed: 10 },
-    { id: 2, title: "Advanced JavaScript", progress: 60, lessons: 15, completed: 9 },
-    { id: 3, title: "Node.js Basics", progress: 30, lessons: 10, completed: 3 }
-  ];
-
-  const upcomingLessons = [
-    { id: 1, title: "React State Management", duration: "8 min", difficulty: "Intermediate" },
-    { id: 2, title: "API Integration", duration: "12 min", difficulty: "Advanced" },
-    { id: 3, title: "Testing Fundamentals", duration: "6 min", difficulty: "Beginner" }
+  const quickActions = [
+    {
+      title: "Continue Learning",
+      description: "Resume where you left off",
+      icon: Play,
+      href: "/library",
+      gradient: "bg-gradient-neural"
+    },
+    {
+      title: "AI Study Assistant",
+      description: "Get personalized help",
+      icon: Brain,
+      href: "/chat",
+      gradient: "bg-gradient-ai"
+    },
+    {
+      title: "Study Plan",
+      description: "View your schedule",
+      icon: Calendar,
+      href: "/study-plan",
+      gradient: "bg-gradient-code"
+    }
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Welcome back, John!</h1>
-          <p className="text-muted-foreground mt-2">Continue your learning journey</p>
+    <div ref={dashboardRef} className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row md:items-center md:justify-between"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gradient-ai mb-2">
+              Welcome back, {user?.name?.split(' ')[0]}! 👋
+            </h1>
+            <p className="text-muted-foreground">
+              Ready to continue your learning journey?
+            </p>
+          </div>
+          <div className="mt-4 md:mt-0 flex items-center space-x-2">
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              Level {user?.stats.level}
+            </Badge>
+            <Avatar>
+              <AvatarImage src={user?.avatar} alt={user?.name} />
+              <AvatarFallback className="bg-primary text-primary-foreground">
+                {user?.name?.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        </motion.div>
+
+        {/* Stats Cards */}
+        <div ref={statsRef} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <Card key={stat.title} className="card-gradient hover-lift transition-all duration-300">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{stat.title}</p>
+                      <p className="text-2xl font-bold mt-1">{stat.value}</p>
+                    </div>
+                    <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                      <Icon className={`h-6 w-6 ${stat.color}`} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 bg-accent/20 rounded-lg">
-                  <BookOpen className="h-6 w-6 text-accent" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{completedLessons}</p>
-                  <p className="text-sm text-muted-foreground">Lessons Completed</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 bg-primary/20 rounded-lg">
-                  <Target className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{currentStreak}</p>
-                  <p className="text-sm text-muted-foreground">Day Streak</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 bg-success/20 rounded-lg">
-                  <Trophy className="h-6 w-6 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{skillsProgress}%</p>
-                  <p className="text-sm text-muted-foreground">Skills Progress</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 bg-warning/20 rounded-lg">
-                  <Zap className="h-6 w-6 text-warning" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">156</p>
-                  <p className="text-sm text-muted-foreground">XP Points</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Continue Learning */}
-            <Card>
+        <div ref={cardsRef} className="grid lg:grid-cols-3 gap-6">
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Quick Actions */}
+            <Card className="card-gradient">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Play className="h-5 w-5" />
-                  <span>Continue Learning</span>
+                  <Zap className="h-5 w-5 text-primary" />
+                  <span>Quick Actions</span>
                 </CardTitle>
-                <CardDescription>
-                  Pick up where you left off
-                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {quickActions.map((action) => {
+                    const Icon = action.icon;
+                    return (
+                      <Link key={action.title} to={action.href}>
+                        <motion.div
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className={`${action.gradient} p-4 rounded-xl text-white hover-lift cursor-pointer group`}
+                        >
+                          <Icon className="h-8 w-8 mb-3 group-hover:scale-110 transition-transform" />
+                          <h3 className="font-semibold mb-1">{action.title}</h3>
+                          <p className="text-sm opacity-90">{action.description}</p>
+                        </motion.div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recommended Lessons */}
+            <Card className="card-gradient">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    <span>Recommended for You</span>
+                  </CardTitle>
+                  <Link to="/library">
+                    <Button variant="ghost" size="sm">
+                      View All
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {currentLearningPath.map((path) => (
-                    <div key={path.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold">{path.title}</h3>
-                        <Badge variant="outline">{path.completed}/{path.lessons} lessons</Badge>
-                      </div>
-                      <Progress value={path.progress} className="mb-2" />
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{path.progress}% complete</span>
-                        <Button size="sm" variant="outline" asChild>
-                          <Link to={`/course/${path.id}`}>Continue</Link>
-                        </Button>
-                      </div>
-                    </div>
+                  {recommendedLessons.map((lesson) => (
+                    <Link key={lesson.id} to={`/lesson/${lesson.id}`}>
+                      <motion.div
+                        whileHover={{ x: 8 }}
+                        className="flex items-center space-x-4 p-4 rounded-lg border border-border hover:border-primary/30 hover:bg-secondary/30 transition-all cursor-pointer"
+                      >
+                        <img
+                          src={lesson.thumbnail}
+                          alt={lesson.title}
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                        <div className="flex-1">
+                          <h3 className="font-semibold mb-1">{lesson.title}</h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {lesson.description}
+                          </p>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {lesson.difficulty}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {lesson.duration} min
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-2xl">
+                          {lesson.type === 'video' && '🎥'}
+                          {lesson.type === 'text' && '📝'}
+                          {lesson.type === 'code-lab' && '💻'}
+                          {lesson.type === 'interactive' && '🎮'}
+                        </div>
+                      </motion.div>
+                    </Link>
                   ))}
                 </div>
               </CardContent>
             </Card>
-
-            {/* Activity Tabs */}
-            <Tabs defaultValue="activity" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                <TabsTrigger value="achievements">Achievements</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="activity" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Activity</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {recentActivity.map((activity) => (
-                        <div key={activity.id} className="flex items-center space-x-4 p-3 border rounded-lg">
-                          <div className="p-2 bg-muted rounded-lg">
-                            {activity.type === "lesson" && <BookOpen className="h-4 w-4" />}
-                            {activity.type === "quiz" && <Target className="h-4 w-4" />}
-                            {activity.type === "achievement" && <Award className="h-4 w-4" />}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium">{activity.title}</p>
-                            <p className="text-sm text-muted-foreground">{activity.time}</p>
-                          </div>
-                          {activity.score && (
-                            <Badge variant="secondary">{activity.score}%</Badge>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="upcoming" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Upcoming Lessons</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {upcomingLessons.map((lesson) => (
-                        <div key={lesson.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{lesson.title}</p>
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span>{lesson.duration}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {lesson.difficulty}
-                              </Badge>
-                            </div>
-                          </div>
-                          <Button size="sm" asChild>
-                            <Link to={`/lesson/${lesson.id}`}>Start</Link>
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="achievements" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Achievements</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 border rounded-lg text-center">
-                        <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <Trophy className="h-6 w-6 text-accent" />
-                        </div>
-                        <h3 className="font-semibold">First Week</h3>
-                        <p className="text-sm text-muted-foreground">Complete 7 days in a row</p>
-                      </div>
-                      <div className="p-4 border rounded-lg text-center">
-                        <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <Star className="h-6 w-6 text-primary" />
-                        </div>
-                        <h3 className="font-semibold">Quick Learner</h3>
-                        <p className="text-sm text-muted-foreground">Complete 50 lessons</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
           </div>
 
-          {/* Sidebar */}
+          {/* Right Column */}
           <div className="space-y-6">
-            {/* Learning Goals */}
-            <Card>
+            {/* Learning Progress */}
+            <Card className="card-gradient">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Target className="h-5 w-5" />
-                  <span>Learning Goals</span>
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <span>Learning Progress</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Daily Goal</span>
-                      <span className="text-sm text-muted-foreground">2/3 lessons</span>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm">Overall Progress</span>
+                      <span className="text-sm font-semibold">{progress.percentage}%</span>
                     </div>
-                    <Progress value={67} />
+                    <Progress value={progress.percentage} className="h-2" />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {progress.completed} of {progress.total} lessons completed
+                    </p>
                   </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Weekly Goal</span>
-                      <span className="text-sm text-muted-foreground">12/15 lessons</span>
+
+                  <div className="pt-4 border-t border-border/50">
+                    <h4 className="font-semibold mb-3">Today's Goal</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        <span className="text-sm">Complete React Hooks lesson</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="h-4 w-4 border-2 border-muted rounded-full" />
+                        <span className="text-sm text-muted-foreground">
+                          Practice TypeScript exercises
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="h-4 w-4 border-2 border-muted rounded-full" />
+                        <span className="text-sm text-muted-foreground">
+                          Review flashcards (5 min)
+                        </span>
+                      </div>
                     </div>
-                    <Progress value={80} />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full justify-start" variant="outline" asChild>
-                  <Link to="/library">
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    Browse Library
-                  </Link>
-                </Button>
-                <Button className="w-full justify-start" variant="outline" asChild>
-                  <Link to="/profile">
-                    <User className="mr-2 h-4 w-4" />
-                    View Profile
-                  </Link>
-                </Button>
-                <Button className="w-full justify-start" variant="outline" asChild>
-                  <Link to="/settings">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Study Reminder */}
-            <Card>
+            {/* Achievements */}
+            <Card className="card-gradient">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Calendar className="h-5 w-5" />
-                  <span>Study Reminder</span>
+                  <Trophy className="h-5 w-5 text-primary" />
+                  <span>Achievements</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Don't break your streak! You've been learning for {currentStreak} days straight.
-                </p>
-                <Button className="w-full" size="sm">
-                  Continue Learning
-                </Button>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-3">Recent Badges</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {earnedBadges.slice(0, 4).map((badge) => (
+                        <motion.div
+                          key={badge.id}
+                          whileHover={{ scale: 1.05 }}
+                          className="p-3 bg-secondary/30 rounded-lg text-center hover-lift"
+                        >
+                          <div className="text-2xl mb-1">{badge.icon}</div>
+                          <p className="text-xs font-semibold">{badge.name}</p>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {nextBadge && (
+                    <div className="pt-4 border-t border-border/50">
+                      <h4 className="font-semibold mb-2">Next Badge</h4>
+                      <div className="flex items-center space-x-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                        <div className="text-2xl opacity-50">{nextBadge.icon}</div>
+                        <div>
+                          <p className="font-medium text-sm">{nextBadge.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {nextBadge.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Chat */}
+            <Card className="card-gradient">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MessageCircle className="h-5 w-5 text-primary" />
+                  <span>AI Assistant</span>
+                </CardTitle>
+                <CardDescription>
+                  Get instant help with your learning
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link to="/chat">
+                  <Button className="w-full bg-gradient-ai hover:opacity-90 text-white">
+                    <Brain className="mr-2 h-4 w-4" />
+                    Start Conversation
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
@@ -322,4 +388,6 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
+};
+
+export default Dashboard;

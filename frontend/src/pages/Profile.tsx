@@ -1,254 +1,192 @@
-import { useState } from "react";
-import { Navbar } from "@/components/Navbar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { 
   User, 
-  Mail, 
-  Calendar, 
-  MapPin, 
-  BookOpen, 
   Trophy, 
+  Calendar, 
+  Clock, 
   Target, 
-  Star,
+  Zap, 
+  Brain, 
+  Code, 
   Award,
+  Star,
   TrendingUp,
-  Clock,
-  Zap,
-  Camera,
-  Settings,
-  Lock
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+  BookOpen,
+  Edit3,
+  Camera
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import profileAvatar from '@/assets/profile-avatar.jpg';
 
-export default function Profile() {
-  const [isEditing, setIsEditing] = useState(false);
-  const [profileData, setProfileData] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john.doe@example.com",
-    bio: "Passionate learner exploring the world of technology and innovation.",
-    location: "San Francisco, CA",
-    joinDate: "January 2024"
-  });
-  const { toast } = useToast();
-
-  const stats = {
-    lessonsCompleted: 47,
-    currentStreak: 12,
-    totalXP: 2340,
-    skillsLearned: 8,
-    certificates: 3,
-    totalHours: 156
-  };
+const Profile: React.FC = () => {
+  const [activeStreak, setActiveStreak] = useState(15);
+  
+  const stats = [
+    { label: "Lessons Completed", value: 42, icon: BookOpen, color: "text-neural-blue" },
+    { label: "Current Streak", value: activeStreak, icon: Zap, color: "text-neural-orange" },
+    { label: "Skill Points", value: 1250, icon: Star, color: "text-neural-cyan" },
+    { label: "Certificates", value: 3, icon: Award, color: "text-neural-purple" }
+  ];
 
   const achievements = [
-    { id: 1, title: "First Steps", description: "Complete your first lesson", earned: true, icon: "🎯" },
-    { id: 2, title: "Week Warrior", description: "Maintain a 7-day streak", earned: true, icon: "🔥" },
-    { id: 3, title: "Knowledge Seeker", description: "Complete 50 lessons", earned: false, icon: "📚" },
-    { id: 4, title: "AI Master", description: "Use AI tools 100 times", earned: true, icon: "🤖" },
-    { id: 5, title: "Speed Learner", description: "Complete 10 lessons in one day", earned: false, icon: "⚡" },
-    { id: 6, title: "Consistent Learner", description: "Maintain a 30-day streak", earned: false, icon: "🏆" }
+    { title: "First Steps", description: "Completed your first lesson", earned: true, date: "2024-01-15" },
+    { title: "Code Warrior", description: "Solved 25 coding challenges", earned: true, date: "2024-01-20" },
+    { title: "Streak Master", description: "Maintained a 7-day learning streak", earned: true, date: "2024-01-25" },
+    { title: "AI Whisperer", description: "Used AI tutor 50 times", earned: false, date: null },
+    { title: "Knowledge Seeker", description: "Completed 100 lessons", earned: false, date: null }
+  ];
+
+  const skillProgress = [
+    { skill: "JavaScript", progress: 85, level: "Advanced" },
+    { skill: "React", progress: 70, level: "Intermediate" },
+    { skill: "Python", progress: 60, level: "Intermediate" },
+    { skill: "TypeScript", progress: 45, level: "Beginner" },
+    { skill: "Node.js", progress: 30, level: "Beginner" }
   ];
 
   const recentActivity = [
-    { date: "Today", lessons: ["React Hooks Fundamentals", "JavaScript ES6 Features"] },
-    { date: "Yesterday", lessons: ["CSS Grid Layout", "Responsive Design Principles"] },
-    { date: "2 days ago", lessons: ["Node.js Basics", "Express.js Introduction"] }
+    { type: "lesson", title: "Advanced React Patterns", date: "2 hours ago", points: 50 },
+    { type: "achievement", title: "Earned 'Code Warrior' badge", date: "1 day ago", points: 100 },
+    { type: "lesson", title: "TypeScript Fundamentals", date: "2 days ago", points: 40 },
+    { type: "streak", title: "Extended learning streak to 15 days", date: "3 days ago", points: 25 }
   ];
-
-  const certificates = [
-    { id: 1, title: "Frontend Development Fundamentals", issueDate: "March 2024", verified: true },
-    { id: 2, title: "JavaScript Mastery", issueDate: "February 2024", verified: true },
-    { id: 3, title: "React Development", issueDate: "January 2024", verified: true }
-  ];
-
-  const handleSaveProfile = () => {
-    setIsEditing(false);
-    toast({
-      title: "Profile updated",
-      description: "Your profile has been successfully updated.",
-    });
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProfileData({
-      ...profileData,
-      [e.target.name]: e.target.value
-    });
-  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Profile Header */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
-              <div className="relative">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src="/api/placeholder/150/150" alt="Profile" />
-                  <AvatarFallback className="text-2xl">
-                    {profileData.firstName[0]}{profileData.lastName[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <Button 
-                  size="sm" 
-                  className="absolute -bottom-2 -right-2 h-8 w-8 p-0 rounded-full"
-                  onClick={() => toast({ title: "Photo upload", description: "Photo upload feature coming soon!" })}
-                >
-                  <Camera className="h-4 w-4" />
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          {/* Profile Header */}
+          <Card className="card-gradient border-primary/20 mb-6">
+            <CardContent className="p-8">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+                <div className="relative">
+                  <Avatar className="w-24 h-24 border-4 border-primary/20">
+                    <AvatarImage src={profileAvatar} alt="Profile" />
+                    <AvatarFallback className="text-2xl bg-primary/20">JD</AvatarFallback>
+                  </Avatar>
+                  <Button size="sm" variant="outline" className="absolute -bottom-2 -right-2 rounded-full p-2">
+                    <Camera className="w-4 h-4" />
+                  </Button>
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-3xl font-bold">John Doe</h1>
+                    <Badge className="bg-primary/20 text-primary border-primary/30">
+                      Level 12
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-4">
+                    Full-stack developer learning advanced React patterns and AI integration
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary">JavaScript Expert</Badge>
+                    <Badge variant="secondary">React Developer</Badge>
+                    <Badge variant="secondary">Quick Learner</Badge>
+                  </div>
+                </div>
+                
+                <Button variant="outline" className="hover-glow">
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Edit Profile
                 </Button>
               </div>
-              
-              <div className="flex-1">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold">
-                      {profileData.firstName} {profileData.lastName}
-                    </h1>
-                    <p className="text-muted-foreground mt-1">{profileData.bio}</p>
-                    <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        {profileData.location}
-                      </div>
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-1" />
-                        Joined {profileData.joinDate}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2 mt-4 sm:mt-0">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsEditing(!isEditing)}
-                    >
-                      <Settings className="h-4 w-4 mr-2" />
-                      {isEditing ? "Cancel" : "Edit Profile"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <BookOpen className="h-6 w-6 text-accent mx-auto mb-2" />
-              <p className="text-2xl font-bold">{stats.lessonsCompleted}</p>
-              <p className="text-xs text-muted-foreground">Lessons</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Target className="h-6 w-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold">{stats.currentStreak}</p>
-              <p className="text-xs text-muted-foreground">Day Streak</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Zap className="h-6 w-6 text-warning mx-auto mb-2" />
-              <p className="text-2xl font-bold">{stats.totalXP}</p>
-              <p className="text-xs text-muted-foreground">XP Points</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Star className="h-6 w-6 text-success mx-auto mb-2" />
-              <p className="text-2xl font-bold">{stats.skillsLearned}</p>
-              <p className="text-xs text-muted-foreground">Skills</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Award className="h-6 w-6 text-accent mx-auto mb-2" />
-              <p className="text-2xl font-bold">{stats.certificates}</p>
-              <p className="text-xs text-muted-foreground">Certificates</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Clock className="h-6 w-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold">{stats.totalHours}</p>
-              <p className="text-xs text-muted-foreground">Hours</p>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {stats.map((stat, index) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className="card-gradient hover-lift">
+                  <CardContent className="p-6 text-center">
+                    <stat.icon className={`w-8 h-8 mx-auto mb-3 ${stat.color}`} />
+                    <div className="text-2xl font-bold text-gradient-ai">{stat.value}</div>
+                    <div className="text-sm text-muted-foreground">{stat.label}</div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
 
-        {/* Profile Tabs */}
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+        {/* Tabs Section */}
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="achievements">Achievements</TabsTrigger>
+            <TabsTrigger value="skills">Skills</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
-            <TabsTrigger value="certificates">Certificates</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card>
+          <TabsContent value="overview">
+            <div className="grid lg:grid-cols-2 gap-6">
+              {/* Learning Progress */}
+              <Card className="card-gradient">
                 <CardHeader>
-                  <CardTitle>Learning Progress</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    Learning Progress
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-6">
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span>Frontend Development</span>
-                      <Badge>85%</Badge>
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Overall Progress</span>
+                        <span>68%</span>
+                      </div>
+                      <Progress value={68} className="h-3 progress-neural" />
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span>JavaScript</span>
-                      <Badge>72%</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>React</span>
-                      <Badge>68%</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Node.js</span>
-                      <Badge>45%</Badge>
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>This Week</span>
+                        <span>5 lessons completed</span>
+                      </div>
+                      <Progress value={83} className="h-2" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              {/* Current Goals */}
+              <Card className="card-gradient">
                 <CardHeader>
-                  <CardTitle>Recent Milestones</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="w-5 h-5 text-primary" />
+                    Current Goals
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-8 w-8 bg-accent/20 rounded-full flex items-center justify-center">
-                        <Trophy className="h-4 w-4 text-accent" />
-                      </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
                       <div>
-                        <p className="font-medium">50 Lessons Completed</p>
-                        <p className="text-sm text-muted-foreground">3 days ago</p>
+                        <p className="font-medium">Master React Hooks</p>
+                        <p className="text-sm text-muted-foreground">7/10 lessons completed</p>
                       </div>
+                      <Progress value={70} className="w-20 h-2" />
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="h-8 w-8 bg-primary/20 rounded-full flex items-center justify-center">
-                        <TrendingUp className="h-4 w-4 text-primary" />
-                      </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
                       <div>
-                        <p className="font-medium">2 Week Streak</p>
-                        <p className="text-sm text-muted-foreground">1 week ago</p>
+                        <p className="font-medium">Complete TypeScript Course</p>
+                        <p className="text-sm text-muted-foreground">3/15 lessons completed</p>
                       </div>
+                      <Progress value={20} className="w-20 h-2" />
                     </div>
                   </div>
                 </CardContent>
@@ -256,175 +194,105 @@ export default function Profile() {
             </div>
           </TabsContent>
 
-          <TabsContent value="achievements" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Achievements</CardTitle>
-                <CardDescription>
-                  Track your learning milestones and unlock new badges
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {achievements.map((achievement) => (
-                    <div 
-                      key={achievement.id} 
-                      className={`p-4 border rounded-lg text-center ${
-                        achievement.earned ? 'bg-muted/30' : 'opacity-50'
-                      }`}
-                    >
-                      <div className="text-4xl mb-2">{achievement.icon}</div>
-                      <h3 className="font-semibold">{achievement.title}</h3>
-                      <p className="text-sm text-muted-foreground">{achievement.description}</p>
+          <TabsContent value="achievements">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {achievements.map((achievement, index) => (
+                <motion.div
+                  key={achievement.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <Card className={`card-gradient hover-lift ${achievement.earned ? 'border-primary/30' : 'opacity-60'}`}>
+                    <CardContent className="p-6 text-center">
+                      <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+                        achievement.earned ? 'bg-primary/20 text-primary' : 'bg-secondary/30 text-muted-foreground'
+                      }`}>
+                        <Trophy className="w-8 h-8" />
+                      </div>
+                      <h3 className="font-semibold mb-2">{achievement.title}</h3>
+                      <p className="text-sm text-muted-foreground mb-3">{achievement.description}</p>
                       {achievement.earned && (
-                        <Badge className="mt-2" variant="secondary">Earned</Badge>
+                        <Badge variant="secondary" className="bg-success/20 text-success">
+                          Earned {achievement.date}
+                        </Badge>
                       )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
           </TabsContent>
 
-          <TabsContent value="activity" className="space-y-6">
-            <Card>
+          <TabsContent value="skills">
+            <Card className="card-gradient">
               <CardHeader>
-                <CardTitle>Learning Activity</CardTitle>
+                <CardTitle>Skill Progression</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {recentActivity.map((day, index) => (
-                    <div key={index}>
-                      <h3 className="font-semibold mb-2">{day.date}</h3>
-                      <div className="space-y-2">
-                        {day.lessons.map((lesson, lessonIndex) => (
-                          <div key={lessonIndex} className="flex items-center space-x-3 p-3 bg-muted/30 rounded-lg">
-                            <BookOpen className="h-4 w-4 text-accent" />
-                            <span>{lesson}</span>
+                  {skillProgress.map((skill, index) => (
+                    <motion.div
+                      key={skill.skill}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-center gap-4"
+                    >
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium">{skill.skill}</span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={
+                              skill.level === 'Advanced' ? 'default' :
+                              skill.level === 'Intermediate' ? 'secondary' : 'outline'
+                            }>
+                              {skill.level}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">{skill.progress}%</span>
                           </div>
-                        ))}
+                        </div>
+                        <Progress value={skill.progress} className="h-2" />
                       </div>
-                      {index < recentActivity.length - 1 && <Separator className="mt-4" />}
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="certificates" className="space-y-6">
-            <Card>
+          <TabsContent value="activity">
+            <Card className="card-gradient">
               <CardHeader>
-                <CardTitle>Your Certificates</CardTitle>
-                <CardDescription>
-                  Certificates you've earned through completing courses
-                </CardDescription>
+                <CardTitle>Recent Activity</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {certificates.map((cert) => (
-                    <div key={cert.id} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold">{cert.title}</h3>
-                          <p className="text-sm text-muted-foreground">Issued {cert.issueDate}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {cert.verified && (
-                            <Badge variant="secondary">
-                              <Award className="h-3 w-3 mr-1" />
-                              Verified
-                            </Badge>
-                          )}
-                          <Button size="sm" variant="outline">Download</Button>
-                        </div>
+                  {recentActivity.map((activity, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-center gap-4 p-4 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors"
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        activity.type === 'lesson' ? 'bg-neural-blue/20 text-neural-blue' :
+                        activity.type === 'achievement' ? 'bg-neural-purple/20 text-neural-purple' :
+                        'bg-neural-orange/20 text-neural-orange'
+                      }`}>
+                        {activity.type === 'lesson' && <BookOpen className="w-5 h-5" />}
+                        {activity.type === 'achievement' && <Trophy className="w-5 h-5" />}
+                        {activity.type === 'streak' && <Zap className="w-5 h-5" />}
                       </div>
-                    </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{activity.title}</p>
+                        <p className="text-sm text-muted-foreground">{activity.date}</p>
+                      </div>
+                      <Badge variant="secondary">+{activity.points} XP</Badge>
+                    </motion.div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {isEditing ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input
-                          id="firstName"
-                          name="firstName"
-                          value={profileData.firstName}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input
-                          id="lastName"
-                          name="lastName"
-                          value={profileData.lastName}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={profileData.email}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="bio">Bio</Label>
-                      <Input
-                        id="bio"
-                        name="bio"
-                        value={profileData.bio}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="location">Location</Label>
-                      <Input
-                        id="location"
-                        name="location"
-                        value={profileData.location}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-                    <Button onClick={handleSaveProfile} className="w-full">
-                      Save Changes
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <div className="flex items-center space-x-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span>{profileData.email}</span>
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <Label>Security</Label>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Lock className="h-4 w-4 mr-2" />
-                        Change Password
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -432,4 +300,6 @@ export default function Profile() {
       </div>
     </div>
   );
-}
+};
+
+export default Profile;

@@ -2,38 +2,54 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Profile from "./pages/Profile";
-import Settings from "./pages/Settings";
-import LibraryPage from "./pages/Library";
-import LessonDetail from "./pages/LessonDetail";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/components/providers/AuthProvider";
+import Layout from "@/components/layout/Layout";
+import ModernHeroSection from "@/components/hero/ModernHeroSection";
+import Login from "@/pages/auth/Login";
+import Register from "@/pages/auth/Register";
+import Onboarding from "@/pages/auth/Onboarding";
+import Dashboard from "@/pages/Dashboard";
+import Library from "@/pages/Library";
+import LessonViewer from "@/pages/LessonViewer";
+import Chat from "@/pages/Chat";
+import StudyPlan from "@/pages/StudyPlan";
+import Profile from "@/pages/Profile";
+import Settings from "@/pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/lesson/:id" element={<LessonDetail />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<ModernHeroSection />} />
+              <Route path="login" element={<Login />} />
+              <Route path="register" element={<Register />} />
+              <Route path="onboarding" element={<Onboarding />} />
+              <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+              <Route path="lesson/:id" element={<ProtectedRoute><LessonViewer /></ProtectedRoute>} />
+              <Route path="chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+              <Route path="study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
+              <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
