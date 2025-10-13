@@ -1,0 +1,263 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html:focus-within {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+}
+
+/* Scroll Reveal Animations */
+[data-reveal] {
+  --reveal-duration: 800ms;
+  --reveal-ease: cubic-bezier(.65,.05,.36,1);
+  opacity: 0;
+  transform: translateY(40px) scale(.98);
+  transition: opacity var(--reveal-duration) var(--reveal-ease), transform var(--reveal-duration) var(--reveal-ease);
+}
+
+[data-reveal][data-reveal-delay] {
+  transition-delay: var(--delay);
+}
+
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Variant: fade-in-left */
+[data-reveal="left"] { transform: translateX(-40px); }
+[data-reveal="right"] { transform: translateX(40px); }
+[data-reveal="left"].is-visible,
+[data-reveal="right"].is-visible { transform: translateX(0); }
+
+/* Scale pop */
+[data-reveal="scale"] { transform: scale(.9); }
+[data-reveal="scale"].is-visible { transform: scale(1); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal], [data-reveal="left"], [data-reveal="right"], [data-reveal="scale"] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Lexicon Design System - Calm, Modern Palette */
+    --background: 210 30% 98%;
+    --foreground: 220 15% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 20%;
+
+    /* Primary: Teal-Blue - Tech credibility & focus */
+    --primary: 190 60% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 190 60% 38%;
+
+    /* Secondary: Green-Teal - Growth & balance */
+    --secondary: 170 50% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 170 50% 42%;
+
+    /* Accent: Warm Orange - Energy & optimism */
+    --accent: 35 100% 60%;
+    --accent-foreground: 220 15% 20%;
+    --accent-hover: 35 100% 52%;
+
+    /* Muted tones */
+    --muted: 210 20% 94%;
+    --muted-foreground: 220 10% 50%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 20% 88%;
+    --input: 210 20% 90%;
+    --ring: 190 60% 45%;
+
+    --radius: 0.75rem;
+    
+    /* Custom design tokens */
+    --success: 170 50% 50%;
+    --warning: 35 100% 60%;
+    --gradient-primary: linear-gradient(135deg, hsl(190 60% 45%), hsl(170 50% 50%));
+    --gradient-warm: linear-gradient(135deg, hsl(35 100% 60%), hsl(25 100% 55%));
+    --shadow-soft: 0 2px 8px -2px hsl(220 15% 20% / 0.08);
+    --shadow-medium: 0 4px 16px -4px hsl(220 15% 20% / 0.12);
+    --shadow-card: 0 2px 12px -2px hsl(220 15% 20% / 0.1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark baseline surfaces while keeping brand hues identical to light mode */
+    --background: 220 20% 10.5%;
+  --foreground: 210 25% 97%;
+
+    --card: 220 18% 14%;
+  --card-foreground: 210 25% 97%;
+
+    --popover: 220 18% 14%;
+  --popover-foreground: 210 25% 97%;
+
+    /* Brand hues preserved from light mode (teal-blue, green-teal, warm orange) */
+    --primary: 190 60% 45%; /* same hue & lightness as light mode */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 190 60% 38%; /* slightly deeper for hover */
+
+    --secondary: 170 50% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 170 50% 42%;
+
+  /* Slightly elevated accent for more orange presence */
+  --accent: 35 100% 63%;
+    --accent-foreground: 220 15% 20%;
+  --accent-hover: 35 100% 55%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 210 15% 68%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 22%;
+    --input: 220 15% 20%;
+    --ring: 190 60% 45%;
+
+    /* Sidebar tokens aligned to new surfaces but brand consistent */
+    --sidebar-background: 220 18% 13%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 190 60% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 20%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 190 60% 45%;
+
+    /* Shadows tuned for dark mode subtle depth */
+    --shadow-soft: 0 2px 8px -2px hsl(220 20% 4% / 0.55);
+    --shadow-medium: 0 4px 16px -4px hsl(220 20% 4% / 0.65);
+    --shadow-card: 0 2px 12px -2px hsl(220 20% 4% / 0.6);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out;
+  }
+
+  .animate-confetti {
+    animation: confetti 0.8s ease-out;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes pulse-soft {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes confetti {
+    0% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-100px) rotate(360deg);
+      opacity: 0;
+    }
+  }
+    /* New hero ambience */
+    .animate-hue { animation: hue-shift 18s linear infinite; }
+    @keyframes hue-shift { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce){ .animate-hue { animation: none; } }
+}
