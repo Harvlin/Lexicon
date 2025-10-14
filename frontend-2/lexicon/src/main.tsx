@@ -22,4 +22,17 @@ import "./index.css";
 	} catch { /* ignore */ }
 })();
 
+// Optional: Redirect to backend /home if enabled via env (useful for dev)
+(() => {
+	try {
+		const shouldRedirect = import.meta.env.VITE_REDIRECT_TO_BACKEND_HOME === 'true';
+		if (!shouldRedirect) return;
+		const backendOrigin = import.meta.env.VITE_BACKEND_ORIGIN || 'http://localhost:8080';
+		const atRoot = location.pathname === '/' || location.pathname === '/index.html';
+		if (atRoot) {
+			location.replace(`${backendOrigin.replace(/\/$/, '')}/home`);
+		}
+	} catch {}
+})();
+
 createRoot(document.getElementById("root")!).render(<App />);

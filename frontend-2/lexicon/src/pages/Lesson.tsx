@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -19,12 +19,22 @@ import { ChatBot } from "@/components/lesson/ChatBot";
 import { Flashcards } from "@/components/lesson/Flashcards";
 import { Quiz } from "@/components/lesson/Quiz";
 import { mockLessons } from "@/lib/mockData";
+import { endpoints } from "@/lib/api";
+import type { LessonDTO } from "@/lib/types";
 import { toast } from "sonner";
 
 export default function Lesson() {
   const { id } = useParams();
-  const lesson = mockLessons.find((l) => l.id === id);
+  const [lesson, setLesson] = useState<LessonDTO | null>(null);
   const [activeTab, setActiveTab] = useState("content");
+
+  useEffect(() => {
+    if (!id) return;
+    endpoints.lessons
+      .get(id)
+      .then(setLesson)
+      .catch(() => setLesson(mockLessons.find((l) => l.id === id) || null));
+  }, [id]);
 
   if (!lesson) {
     return (
@@ -38,9 +48,18 @@ export default function Lesson() {
   }
 
   const handleCompleteLesson = () => {
-    toast.success("Lesson completed! 🎉", {
-      description: "You earned 50 points!",
-    });
+    if (!lesson) return;
+    const prev = lesson;
+    setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
+    endpoints.lessons
+      .complete(lesson.id)
+      .then(() => {
+        toast.success("Lesson completed! 🎉", { description: "Progress updated." });
+      })
+      .catch(() => {
+        setLesson(prev);
+        toast.error("Failed to mark as complete");
+      });
   };
 
   return (

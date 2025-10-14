@@ -1,22 +1,39 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { mockFlashcards } from "@/lib/mockData";
+import { useParams } from "react-router-dom";
+import { endpoints } from "@/lib/api";
+import type { FlashcardDTO } from "@/lib/types";
 
 export function Flashcards() {
+  const { id } = useParams();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [completedCards, setCompletedCards] = useState<Set<number>>(new Set());
+  const [cards, setCards] = useState<FlashcardDTO[]>([]);
 
-  const currentCard = mockFlashcards[currentIndex];
-  const progress = (completedCards.size / mockFlashcards.length) * 100;
+  useEffect(() => {
+    if (!id) {
+      setCards(mockFlashcards);
+      return;
+    }
+    endpoints.lessons
+      .flashcards(id)
+      .then(setCards)
+      .catch(() => setCards(mockFlashcards));
+  }, [id]);
+
+  const total = cards.length || mockFlashcards.length;
+  const currentCard = (cards[currentIndex] || mockFlashcards[currentIndex]);
+  const progress = (completedCards.size / total) * 100;
 
   const handleNext = () => {
     setIsFlipped(false);
-    if (currentIndex < mockFlashcards.length - 1) {
+    if (currentIndex < total - 1) {
       setCurrentIndex(currentIndex + 1);
     }
   };
@@ -46,7 +63,7 @@ export function Flashcards() {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Card {currentIndex + 1} of {mockFlashcards.length}
+            Card {currentIndex + 1} of {total}
           </span>
           <span className="text-sm font-medium text-primary">
             {completedCards.size} reviewed
@@ -113,7 +130,7 @@ export function Flashcards() {
 
         <Button
           onClick={handleNext}
-          disabled={currentIndex === mockFlashcards.length - 1}
+          disabled={currentIndex === total - 1}
           className="bg-accent hover:bg-accent-hover"
         >
           Next

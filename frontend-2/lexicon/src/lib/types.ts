@@ -46,3 +46,61 @@ export interface ApiList<T> {
   items: T[];
   total: number;
 }
+
+export interface QuizQuestionDTO {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation?: string;
+}
+
+export interface FlashcardDTO {
+  id: string;
+  front: string;
+  back: string;
+}
+
+export interface QuizAnswerDTO {
+  questionId: string;
+  selectedOption: number;
+}
+
+export interface QuizSubmissionResultDTO {
+  total: number;
+  correct: number;
+  score: number; // 0-100
+  passed?: boolean;
+  pointsAwarded?: number;
+}
+
+// Onboarding & Schedule
+export interface OnboardingDTO {
+  goals: string[];
+  skills: string[];
+  dailyHours: number;
+  preferredTime?: string; // legacy display
+  schedulePreset: string; // "Morning" | "Afternoon" | "Evening" | "Late Night" | "Custom"
+  daysOfWeek: string[];   // when Custom
+  specificTime?: string;  // HH:mm when Custom
+  reminderEnabled?: boolean;
+  completedAt?: string;   // ISO
+}
+
+export interface ScheduleSessionDTO {
+  id: string;
+  lessonId: string;
+  date: string;            // yyyy-mm-dd
+  plannedMinutes: number;
+  actualMinutes?: number;
+  status: 'planned' | 'in-progress' | 'done' | 'skipped';
+  createdAt: string;
+  updatedAt: string;
+  focusTag?: string;
+}
+
+export interface ScheduleWeekDTO {
+  weekId: string;
+  sessions: ScheduleSessionDTO[];
+  source?: 'api' | 'onboarding' | 'mock';
+}

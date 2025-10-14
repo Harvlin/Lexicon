@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { mockLessons } from '@/lib/mockData';
+import { endpoints } from '@/lib/api';
+import type { ScheduleSessionDTO, ScheduleWeekDTO } from '@/lib/types';
 
 /**
  * Schedule session domain model
@@ -16,7 +18,7 @@ export interface ScheduleSession {
   focusTag?: string;       // optional tag (e.g. "review", "core", etc.)
 }
 
-interface WeekData { sessions: ScheduleSession[]; source?: 'onboarding' | 'mock'; }
+interface WeekData { sessions: ScheduleSession[]; source?: 'onboarding' | 'mock' | 'api'; }
 
 // Prefer new brand key; migrate legacy if present
 const STORAGE_KEY = 'lexigrain:schedule:v1';
@@ -187,21 +189,36 @@ export function useSchedule(initialDate: Date = new Date()): UseScheduleApi {
     return {} as StoredShape;
   });
 
-  // ensure week exists
+  // Ensure week exists by trying backend first, then fallback generate/store
   useEffect(() => {
-    setStore(prev => {
-      if (prev[weekId]) return prev;
-      const generated = generateWeekFromOnboarding(weekId);
-      const next = { ...prev, [weekId]: generated };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
+    (async () => {
+      try {
+        const serverWeek = await endpoints.schedule.getWeek(weekId);
+        setStore(prev => ({ ...prev, [weekId]: { sessions: serverWeek.sessions as any, source: 'api' } }));
+        return;
+      } catch {
+        // ignore and fallback to local
+      }
+      setStore(prev => {
+        if (prev[weekId]) return prev;
+        const generated = generateWeekFromOnboarding(weekId);
+        const next = { ...prev, [weekId]: generated };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        return next;
+      });
+    })();
   }, [weekId]);
 
   const persist = useCallback((next: StoredShape) => {
     setStore(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }, []);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+    // Best-effort push current week to API
+    const current = next[weekId];
+    if (current) {
+      const payload: ScheduleWeekDTO = { weekId, sessions: current.sessions as unknown as ScheduleSessionDTO[], source: 'onboarding' };
+      endpoints.schedule.saveWeek(weekId, payload).catch(() => {});
+    }
+  }, [weekId]);
 
   const currentWeekSessions = useMemo(() => store[weekId]?.sessions ?? [], [store, weekId]);
   const currentWeekSource = store[weekId]?.source;
@@ -217,26 +234,39 @@ export function useSchedule(initialDate: Date = new Date()): UseScheduleApi {
   }, [persist, store, weekId, currentWeekSessions]);
 
   const addSession: UseScheduleApi['addSession'] = useCallback((input) => {
-    mutateWeek(sessions => [...sessions, {
+    const newSession: ScheduleSessionDTO = {
       id: safeUuid(),
       lessonId: input.lessonId,
       date: input.date,
       plannedMinutes: input.plannedMinutes,
-      status: input.status ?? 'planned',
-      actualMinutes: input.actualMinutes,
-      focusTag: input.focusTag,
+      status: (input as any).status ?? 'planned',
+      actualMinutes: (input as any).actualMinutes,
+      focusTag: (input as any).focusTag,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    }]);
-  }, [mutateWeek]);
+    };
+    mutateWeek(sessions => [...sessions, newSession]);
+    const payload = {
+      lessonId: newSession.lessonId,
+      date: newSession.date,
+      plannedMinutes: newSession.plannedMinutes,
+      status: newSession.status,
+      actualMinutes: newSession.actualMinutes,
+      focusTag: newSession.focusTag,
+    } as Omit<ScheduleSessionDTO, 'id' | 'createdAt' | 'updatedAt'>;
+    endpoints.schedule.addSession(weekId, payload).catch(() => {});
+  }, [mutateWeek, weekId]);
 
   const updateSession: UseScheduleApi['updateSession'] = useCallback((id, patch) => {
-    mutateWeek(sessions => sessions.map(s => s.id === id ? { ...s, ...patch, updatedAt: new Date().toISOString() } : s));
-  }, [mutateWeek]);
+    const withTs = { ...patch, updatedAt: new Date().toISOString() } as Partial<ScheduleSessionDTO>;
+    mutateWeek(sessions => sessions.map(s => s.id === id ? { ...s, ...withTs } : s));
+    endpoints.schedule.updateSession(weekId, id, withTs).catch(() => {});
+  }, [mutateWeek, weekId]);
 
   const deleteSession: UseScheduleApi['deleteSession'] = useCallback((id) => {
     mutateWeek(sessions => sessions.filter(s => s.id !== id));
-  }, [mutateWeek]);
+    endpoints.schedule.deleteSession(weekId, id).catch(() => {});
+  }, [mutateWeek, weekId]);
 
   const setStatus: UseScheduleApi['setStatus'] = useCallback((id, status) => {
     updateSession(id, { status });

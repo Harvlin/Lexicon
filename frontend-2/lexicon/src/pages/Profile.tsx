@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Calendar, Target, Mail, MapPin, Edit, Settings as SettingsIcon, BookOpen, TrendingUp, Trophy, Bell, Monitor, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -5,8 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { mockUser, mockProgress } from "@/lib/mockData";
 import { Link } from "react-router-dom";
+import { endpoints } from "@/lib/api";
+import type { UserDTO, UserProgressSummaryDTO } from "@/lib/types";
 
 export default function Profile() {
+  const [user, setUser] = useState<UserDTO | null>(null);
+  const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
+
+  useEffect(() => {
+    endpoints.me
+      .get()
+      .then(setUser)
+      .catch(() => setUser({ name: mockUser.name, email: mockUser.email, avatar: mockUser.avatar, joinedDate: mockUser.joinedDate }));
+    endpoints.progress
+      .summary()
+      .then(setProgress)
+      .catch(() => setProgress(mockProgress));
+  }, []);
 
   return (
     <div className="space-y-8 pb-8 max-w-4xl mx-auto">
@@ -30,13 +46,13 @@ export default function Profile() {
           <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
             <div className="relative">
               <Avatar className="h-32 w-32 border-4 border-primary/30 shadow-card">
-                <AvatarImage src={mockUser.avatar} alt={mockUser.name} />
+                <AvatarImage src={user?.avatar || mockUser.avatar} alt={user?.name || mockUser.name} />
                 <AvatarFallback className="text-3xl">SJ</AvatarFallback>
               </Avatar>
               <div className="absolute -bottom-2 -right-2 h-14 w-14 rounded-full bg-accent border-4 border-card flex items-center justify-center shadow-card">
                 <div className="text-center">
                   <div className="text-sm font-bold text-white leading-none">
-                    {mockProgress.level}
+                    {progress?.level ?? mockProgress.level}
                   </div>
                   <div className="text-[10px] text-white/80 leading-none mt-0.5">
                     Level
@@ -55,12 +71,12 @@ export default function Profile() {
             <div className="flex-1 text-center md:text-left space-y-4">
               <div>
                 <h2 className="text-3xl font-heading font-bold mb-2">
-                  {mockUser.name}
+                  {user?.name || mockUser.name}
                 </h2>
                 <div className="flex flex-col md:flex-row items-center md:items-start gap-3 text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4" />
-                    <span>{mockUser.email}</span>
+                    <span>{user?.email || mockUser.email}</span>
                   </div>
                   <div className="hidden md:block">•</div>
                   <div className="flex items-center gap-2">
@@ -73,14 +89,14 @@ export default function Profile() {
               <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                 <Badge className="bg-primary/10 text-primary border-primary/20 gap-1.5 px-3 py-1.5">
                   <Target className="h-4 w-4" />
-                  Level {mockProgress.level} Learner
+                  Level {progress?.level ?? mockProgress.level} Learner
                 </Badge>
                 <Badge variant="secondary" className="gap-1.5 px-3 py-1.5">
                   <Calendar className="h-4 w-4" />
-                  Joined {new Date(mockUser.joinedDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                  Joined {new Date(user?.joinedDate || mockUser.joinedDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                 </Badge>
                 <Badge className="bg-gradient-warm text-white gap-1.5 px-3 py-1.5 animate-pulse-soft shadow-card">
-                  🔥 {mockProgress.streakDays} day streak
+                  🔥 {progress?.streakDays ?? mockProgress.streakDays} day streak
                 </Badge>
               </div>
 
@@ -101,7 +117,7 @@ export default function Profile() {
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Total Lessons</p>
                 <p className="text-3xl font-bold font-heading text-primary">
-                  {mockProgress.lessonsCompleted}
+                  {progress?.lessonsCompleted ?? mockProgress.lessonsCompleted}
                 </p>
               </div>
               <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -117,7 +133,7 @@ export default function Profile() {
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Total Points</p>
                 <p className="text-3xl font-bold font-heading text-secondary">
-                  {mockProgress.totalPoints.toLocaleString()}
+                  {(progress?.totalPoints ?? mockProgress.totalPoints).toLocaleString()}
                 </p>
               </div>
               <div className="h-12 w-12 rounded-lg bg-secondary/10 flex items-center justify-center">
@@ -133,7 +149,7 @@ export default function Profile() {
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Achievements</p>
                 <p className="text-3xl font-bold font-heading text-accent">
-                  {mockProgress.badges.length}
+                  {(progress?.badges?.length ?? mockProgress.badges.length)}
                 </p>
               </div>
               <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">

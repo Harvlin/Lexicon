@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +6,9 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { mockQuizQuestions } from "@/lib/mockData";
 import { toast } from "sonner";
+import { useParams } from "react-router-dom";
+import { endpoints } from "@/lib/api";
+import type { QuizAnswerDTO, QuizQuestionDTO, QuizSubmissionResultDTO } from "@/lib/types";
 
 type Answer = {
   questionId: string;
@@ -14,14 +17,29 @@ type Answer = {
 };
 
 export function Quiz() {
+  const { id } = useParams();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [questions, setQuestions] = useState<QuizQuestionDTO[]>([]);
+  const [serverResult, setServerResult] = useState<QuizSubmissionResultDTO | null>(null);
 
-  const question = mockQuizQuestions[currentQuestion];
-  const progress = ((currentQuestion + 1) / mockQuizQuestions.length) * 100;
+  useEffect(() => {
+    if (!id) {
+      setQuestions(mockQuizQuestions);
+      return;
+    }
+    endpoints.lessons
+      .quiz(id)
+      .then(setQuestions)
+      .catch(() => setQuestions(mockQuizQuestions));
+  }, [id]);
+
+  const question = questions[currentQuestion] || mockQuizQuestions[currentQuestion];
+  const total = questions.length || mockQuizQuestions.length;
+  const progress = ((currentQuestion + 1) / total) * 100;
   const currentAnswer = answers.find((a) => a.questionId === question.id);
 
   const handleOptionSelect = (optionIndex: number) => {
@@ -54,12 +72,26 @@ export function Quiz() {
   };
 
   const handleNext = () => {
-    if (currentQuestion < mockQuizQuestions.length - 1) {
+    if (currentQuestion < total - 1) {
       setCurrentQuestion(currentQuestion + 1);
       setSelectedOption(null);
       setShowExplanation(false);
     } else {
-      setIsCompleted(true);
+      // Submit to backend for final scoring
+      if (id) {
+        const payload: QuizAnswerDTO[] = answers.map(a => ({ questionId: a.questionId, selectedOption: a.selectedOption }));
+        endpoints.lessons
+          .submitQuiz(id, payload)
+          .then((res) => {
+            setServerResult(res);
+            setIsCompleted(true);
+          })
+          .catch(() => {
+            setIsCompleted(true);
+          });
+      } else {
+        setIsCompleted(true);
+      }
     }
   };
 
@@ -72,8 +104,8 @@ export function Quiz() {
   };
 
   if (isCompleted) {
-    const correctAnswers = answers.filter((a) => a.isCorrect).length;
-    const score = (correctAnswers / mockQuizQuestions.length) * 100;
+  const correctAnswers = answers.filter((a) => a.isCorrect).length;
+  const score = serverResult ? serverResult.score : (correctAnswers / total) * 100;
 
     return (
       <div className="space-y-6 animate-scale-in">
@@ -86,9 +118,12 @@ export function Quiz() {
               Quiz Completed!
             </h2>
             <p className="text-lg opacity-90 mb-6">
-              You scored {correctAnswers} out of {mockQuizQuestions.length}
+              You scored {serverResult ? serverResult.correct : correctAnswers} out of {serverResult ? serverResult.total : total}
             </p>
             <div className="text-5xl font-bold mb-2">{Math.round(score)}%</div>
+            {serverResult?.pointsAwarded !== undefined && (
+              <p className="opacity-90 mt-2">+{serverResult.pointsAwarded} pts</p>
+            )}
             <p className="opacity-90">
               {score >= 80
                 ? "Excellent work!"
@@ -122,7 +157,7 @@ export function Quiz() {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Question {currentQuestion + 1} of {mockQuizQuestions.length}
+            Question {currentQuestion + 1} of {total}
           </span>
           <span className="text-sm font-medium text-primary">
             {answers.filter((a) => a.isCorrect).length} correct
@@ -134,13 +169,13 @@ export function Quiz() {
       <Card>
         <CardContent className="p-6">
           <h3 className="text-lg font-heading font-semibold mb-6">
-            {question.question}
+            {question?.question}
           </h3>
 
           <div className="space-y-3">
-            {question.options.map((option, index) => {
+            {(question?.options || []).map((option, index) => {
               const isSelected = selectedOption === index;
-              const isCorrect = index === question.correctAnswer;
+              const isCorrect = index === question!.correctAnswer;
               const showResult = currentAnswer !== undefined;
 
               return (
@@ -175,7 +210,7 @@ export function Quiz() {
             <div className="mt-6 p-4 rounded-lg bg-muted animate-slide-up">
               <p className="text-sm font-medium mb-2">Explanation:</p>
               <p className="text-sm text-muted-foreground">
-                {question.explanation}
+                {question?.explanation}
               </p>
             </div>
           )}
@@ -193,7 +228,7 @@ export function Quiz() {
           </Button>
         ) : (
           <Button onClick={handleNext} className="bg-accent hover:bg-accent-hover">
-            {currentQuestion < mockQuizQuestions.length - 1 ? "Next Question" : "View Results"}
+            {currentQuestion < total - 1 ? "Next Question" : "View Results"}
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         )}

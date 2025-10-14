@@ -46,12 +46,11 @@ export function MarketingNavbar() {
   };
 
   return (
-  <header className={`fixed top-0 inset-x-0 z-50 transition-all ${scrolled ? 'bg-background/80 backdrop-blur border-b shadow-sm' : 'bg-background/40 backdrop-blur-sm'} border-border`}>      
-      <div className="max-w-7xl mx-auto px-4 flex h-16 items-center gap-6">
+  <header className={`fixed top-0 inset-x-0 z-50 transition-all ${scrolled ? 'bg-background/80 backdrop-blur border-b shadow-sm' : 'bg-background/40 backdrop-blur-sm'} border-border`}>
+    <div className="max-w-7xl mx-auto px-4 flex h-16 items-center gap-6">
         {/* Brand */}
-        <Link to="/home" className="flex items-center gap-2">
-          <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-lg shadow">L</div>
-          <span className="hidden sm:inline-block font-heading font-bold text-lg tracking-tight">Lexigrain</span>
+        <Link to="/home" className="flex items-center">
+          <img src="/nav-kanan-3.png" alt="Lexigrain" className="h-10 sm:h-12 w-auto object-contain" />
         </Link>
 
         {/* Desktop Nav */}

@@ -46,6 +46,8 @@ const TIME_OPTIONS = ["Morning", "Afternoon", "Evening", "Late Night"];
 const DAY_OPTIONS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const STORAGE_KEY = "lexigrain:onboarding";
+import { endpoints } from "@/lib/api";
+import type { OnboardingDTO } from "@/lib/types";
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -74,29 +76,38 @@ export default function Onboarding() {
   const [existingData, setExistingData] = useState<any>(null);
 
   useEffect(() => {
-    let raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const legacy = localStorage.getItem('lexicon:onboarding');
-      if (legacy) {
-        try { localStorage.setItem(STORAGE_KEY, legacy); } catch {}
-        raw = legacy;
-      }
-    }
-    if (raw) {
+    // Prefer backend onboarding if available, fallback to local storage; migrate legacy
+    (async () => {
       try {
-        const parsed = JSON.parse(raw);
-        setExistingData(parsed);
-        if (parsed?.completedAt && !force && !restart && !freshOnboarding) {
+        const server = await endpoints.onboarding.get();
+        setExistingData(server);
+        if (server?.completedAt && !force && !restart && !freshOnboarding) {
           navigate("/");
         }
-        if (restart) {
-          // Clear and start fresh
-            localStorage.removeItem(STORAGE_KEY);
-        }
       } catch {
-        // ignore
+        let raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          const legacy = localStorage.getItem('lexicon:onboarding');
+          if (legacy) {
+            try { localStorage.setItem(STORAGE_KEY, legacy); } catch {}
+            raw = legacy;
+          }
+        }
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            setExistingData(parsed);
+            if (parsed?.completedAt && !force && !restart && !freshOnboarding) {
+              navigate("/");
+            }
+          } catch {}
+        }
       }
-    }
+      if (restart) {
+        localStorage.removeItem(STORAGE_KEY);
+        try { await endpoints.onboarding.save({} as OnboardingDTO); } catch {}
+      }
+    })();
   }, [navigate, force, restart, freshOnboarding]);
 
   const totalSteps = 5; // added conclusion step
@@ -140,7 +151,7 @@ export default function Onboarding() {
     }
   };
 
-  const finish = () => {
+  const finish = async () => {
     setSaving(true);
     const payload = {
       goals: [...state.goals, ...(state.customGoal ? [state.customGoal] : [])],
@@ -154,11 +165,14 @@ export default function Onboarding() {
       reminderEnabled: !!state.reminderEnabled,
       completedAt: new Date().toISOString(),
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    setTimeout(() => {
-      setSaving(false);
-      navigate("/");
-    }, 600);
+    try {
+      await endpoints.onboarding.save(payload as OnboardingDTO);
+    } catch {
+      // fallback to local storage
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
+    }
+    setSaving(false);
+    navigate("/");
   };
 
   // Completion guards for stepper navigation

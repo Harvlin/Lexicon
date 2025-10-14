@@ -7,14 +7,36 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProgressRing } from "@/components/dashboard/ProgressRing";
 import { mockUser, mockProgress, mockLessons } from "@/lib/mockData";
 import { achievementsData, achievementCategories, achievementRarities } from "@/lib/achievementsData";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { endpoints } from "@/lib/api";
+import type { UserProgressSummaryDTO, LessonDTO } from "@/lib/types";
 
 export default function ProgressPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
+  const [completed, setCompleted] = useState<LessonDTO[]>([]);
+  const [inProgress, setInProgress] = useState<LessonDTO[]>([]);
+
+  useEffect(() => {
+    endpoints.progress
+      .summary()
+      .then(setProgress)
+      .catch(() => setProgress(mockProgress));
+    // Optional: fetch completed/in-progress lessons; fallback to mock
+    endpoints.lessons
+      .list({ completed: true, size: 50 })
+      .then((res) => setCompleted(res.items))
+      .catch(() => setCompleted(mockLessons.filter((l) => l.progress === 100)));
+    endpoints.lessons
+      .list({ inProgress: true, size: 50 })
+      .then((res) => setInProgress(res.items))
+      .catch(() => setInProgress(mockLessons.filter((l) => l.progress > 0 && l.progress < 100)));
+  }, []);
   
-  const completedLessons = mockLessons.filter((l) => l.progress === 100);
-  const inProgressLessons = mockLessons.filter((l) => l.progress > 0 && l.progress < 100);
-  const completionRate = (mockProgress.lessonsCompleted / mockProgress.totalLessons) * 100;
+  const completedLessons = completed.length ? completed : mockLessons.filter((l) => l.progress === 100);
+  const inProgressLessons = inProgress.length ? inProgress : mockLessons.filter((l) => l.progress > 0 && l.progress < 100);
+  const summary = progress || mockProgress;
+  const completionRate = useMemo(() => (summary.totalLessons ? (summary.lessonsCompleted / summary.totalLessons) * 100 : 0), [summary]);
 
   const earnedAchievements = achievementsData.filter((a) => a.progress === 100);
   const inProgressAchievements = achievementsData.filter((a) => a.progress > 0 && a.progress < 100);
@@ -79,10 +101,10 @@ export default function ProgressPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold font-heading text-primary mb-2">
-              {mockProgress.lessonsCompleted}
+              {summary.lessonsCompleted}
             </div>
             <div className="flex items-center gap-2">
-              <Progress value={(mockProgress.lessonsCompleted / mockProgress.totalLessons) * 100} className="h-1.5" />
+              <Progress value={(summary.totalLessons ? (summary.lessonsCompleted / summary.totalLessons) * 100 : 0)} className="h-1.5" />
             </div>
             <p className="text-sm text-muted-foreground mt-2">
               {inProgressLessons.length} in progress
@@ -101,7 +123,7 @@ export default function ProgressPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold font-heading text-secondary mb-2">
-              {mockProgress.totalPoints.toLocaleString()}
+              {summary.totalPoints.toLocaleString()}
             </div>
             <div className="flex items-center gap-2 text-xs">
               <Badge variant="secondary" className="bg-secondary/10 text-secondary">
@@ -125,10 +147,10 @@ export default function ProgressPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold font-heading text-accent mb-2">
-              {mockProgress.badges.length}
+              {summary.badges.length}
             </div>
             <div className="flex items-center gap-2 mb-2">
-              {mockProgress.badges.slice(0, 3).map((badge) => (
+              {summary.badges.slice(0, 3).map((badge) => (
                 <div key={badge.id} className="h-7 w-7 rounded-md border bg-muted grid place-items-center" title={badge.name}>
                   <BadgeIconByName name={badge.name} />
                 </div>
@@ -150,7 +172,7 @@ export default function ProgressPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold font-heading mb-2">{mockProgress.streakDays}</div>
+            <div className="text-4xl font-bold font-heading mb-2">{summary.streakDays}</div>
             <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
               <div className="h-full w-3/4 bg-accent rounded-full animate-pulse-soft"></div>
             </div>

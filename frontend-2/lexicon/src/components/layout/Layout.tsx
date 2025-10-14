@@ -16,7 +16,7 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background">
       {/* Global header above sidebar and content */}
       <div className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 [padding-top:env(safe-area-inset-top)]">
-        <div className="relative w-full h-14 grid grid-cols-3 items-center">
+        <div className="relative w-full h-16 grid grid-cols-3 items-center">
           {/* Left: brand + mobile menu */}
           <div className="pl-3 sm:pl-4 flex items-center gap-2">
             <Button
@@ -28,9 +28,12 @@ export function Layout({ children }: LayoutProps) {
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <Link to="/home" className="flex items-center gap-2 group">
-              <div className="h-8 w-8 rounded-lg bg-accent text-accent-foreground flex items-center justify-center font-bold group-hover:scale-105 transition">L</div>
-              <span className="hidden sm:inline-block font-heading font-semibold text-base">Lexigrain</span>
+            <Link to="/home" className="flex items-center">
+              <img
+                src="/nav-kanan-3.png"
+                alt="Lexigrain"
+                className="h-12 sm:h-14 w-auto object-contain"
+              />
             </Link>
           </div>
           {/* Center: search */}

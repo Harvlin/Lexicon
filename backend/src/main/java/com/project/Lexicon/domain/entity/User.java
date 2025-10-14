@@ -37,5 +37,7 @@ public class User {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    @Builder.Default
     private Boolean isActive = true;
 }
