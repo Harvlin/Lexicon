@@ -15,7 +15,7 @@ export function CTABannerSection(){
               <Sparkles className="w-10 h-10 text-white" />
             </div>
           </motion.div>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-white leading-tight">Start Learning with Lexicon</h2>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-white leading-tight">Start Learning with Lexigrain</h2>
           <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto leading-relaxed">Your AI co‑pilot for mastering complex topics. Join thousands compounding knowledge daily.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Button size="lg" className="text-lg px-8 py-6 bg-white text-primary hover:bg-white/90 shadow-elevated group">

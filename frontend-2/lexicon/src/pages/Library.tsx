@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Filter, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,62 +15,65 @@ import { mockLessons, categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { endpoints } from "@/lib/api";
 import type { LessonDTO } from "@/lib/types";
+import { useServerFirst } from "@/hooks/useServerFirst";
 
 type SortOption = "recommended" | "newest" | "popular" | "duration";
 type DifficultyFilter = "all" | "beginner" | "intermediate" | "advanced";
 
 export default function Library() {
-  const [lessons, setLessons] = useState<LessonDTO[]>(mockLessons);
+  // Lessons: show mock immediately, then auto-upgrade to API when ready
+  const query = useMemo(() => ({
+    search: (undefined as string | undefined), // filled below by state
+    category: (undefined as string | undefined),
+    difficulty: (undefined as string | undefined),
+    sort: (undefined as string | undefined),
+    page: 1,
+    limit: 30,
+  }), []);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState<SortOption>("recommended");
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("all");
-  const [categoryList, setCategoryList] = useState<string[]>(categories);
+  // Categories: show fallback immediately, then auto-upgrade to API
+  const { data: categoryList } = useServerFirst<string[]>(
+    categories,
+    () => endpoints.categories.list(),
+    []
+  );
 
-  // Load categories from API
-  useEffect(() => {
-    endpoints.categories
-      .list()
-      .then(setCategoryList)
-      .catch(() => setCategoryList(categories));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { data: lessons, source: lessonsSource } = useServerFirst<LessonDTO[]>(
+    mockLessons,
+    () => {
+      const q: Record<string, string | number | boolean | undefined> = {
+        search: searchQuery || undefined,
+        category: selectedCategory !== "All" ? selectedCategory : undefined,
+        difficulty: difficultyFilter !== "all" ? difficultyFilter : undefined,
+        sort: sortBy,
+        page: 1,
+        limit: 30,
+      };
+      return endpoints.lessons.list(q).then(res => res.items);
+    },
+    [searchQuery, selectedCategory, difficultyFilter, sortBy]
+  );
 
-  // Fetch lessons when filters/search change
-  useEffect(() => {
-    const query: Record<string, string | number | boolean | undefined> = {
-      search: searchQuery || undefined,
-      category: selectedCategory !== "All" ? selectedCategory : undefined,
-      difficulty: difficultyFilter !== "all" ? difficultyFilter : undefined,
-      sort: sortBy,
-      page: 1,
-      limit: 30,
-    };
-    endpoints.lessons
-      .list(query)
-      .then((res) => setLessons(res.items))
-      .catch(() => setLessons(mockLessons));
-  }, [searchQuery, selectedCategory, difficultyFilter, sortBy]);
+  // Maintain a local view that we can update optimistically, and resync when server data changes
+  const [lessonsView, setLessonsView] = useState<LessonDTO[]>(lessons);
+  useEffect(() => setLessonsView(lessons), [lessons]);
 
   const handleToggleFavorite = (id: string) => {
     // Optimistic toggle then confirm via API
-    setLessons((prev) =>
-      prev.map((lesson) =>
-        lesson.id === id ? { ...lesson, isFavorite: !lesson.isFavorite } : lesson
-      )
-    );
+    const prev = lessonsView;
+    const next = lessonsView.map(l => l.id === id ? { ...l, isFavorite: !l.isFavorite } : l);
+    setLessonsView(next);
     endpoints.lessons.toggleFavorite(id).catch(() => {
       // Revert on failure
-      setLessons((prev) =>
-        prev.map((lesson) =>
-          lesson.id === id ? { ...lesson, isFavorite: !lesson.isFavorite } : lesson
-        )
-      );
+      setLessonsView(prev);
     });
   };
 
   // Filter lessons
-  const filteredLessons = lessons.filter((lesson) => {
+  const filteredLessons = useMemo(() => lessonsView.filter((lesson) => {
     const matchesSearch =
       lesson.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       lesson.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -85,10 +88,10 @@ export default function Library() {
       difficultyFilter === "all" || lesson.difficulty === difficultyFilter;
 
     return matchesSearch && matchesCategory && matchesDifficulty;
-  });
+  }), [lessons, searchQuery, selectedCategory, difficultyFilter]);
 
   // Sort lessons
-  const sortedLessons = [...filteredLessons].sort((a, b) => {
+  const sortedLessons = useMemo(() => [...filteredLessons].sort((a, b) => {
     switch (sortBy) {
       case "duration":
         return a.duration - b.duration;
@@ -99,7 +102,7 @@ export default function Library() {
       default:
         return 0;
     }
-  });
+  }), [filteredLessons, sortBy]);
 
   return (
     <div className="space-y-6 pb-8">
@@ -180,6 +183,9 @@ export default function Library() {
           Showing {sortedLessons.length} {sortedLessons.length === 1 ? "lesson" : "lessons"}
           {searchQuery && ` for "${searchQuery}"`}
         </p>
+        {lessonsSource === 'api' && (
+          <span className="text-xs text-emerald-600 dark:text-emerald-400">Updated with live results</span>
+        )}
         {(searchQuery || selectedCategory !== "All" || difficultyFilter !== "all") && (
           <Button
             variant="ghost"
