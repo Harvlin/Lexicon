@@ -46,10 +46,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/lessons/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN")
-                        .requestMatchers("/api/quiz/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN")
-                        .requestMatchers("/api/flashcards/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN")
-                        .requestMatchers("/api/progress/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN")
+                        .requestMatchers("/api/lessons/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
+                        .requestMatchers("/api/quiz/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
+                        .requestMatchers("/api/flashcards/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
+                        .requestMatchers("/api/progress/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
                         .anyRequest().authenticated()
                 );
         http.exceptionHandling(ex -> ex

@@ -16,8 +16,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        // This is a good practice to only find active users.
         User user = userRepository.findByEmailAndIsActiveTrue(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found or inactive"));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found or is inactive"));
 
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
@@ -26,7 +27,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .accountExpired(false)
                 .accountLocked(false)
                 .credentialsExpired(false)
-                .disabled(user.getIsActive())
+                .disabled(!user.getIsActive())
                 .build();
     }
 }

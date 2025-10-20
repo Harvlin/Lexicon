@@ -41,19 +41,23 @@ export function LandingNavbar() {
   };
   return (
     <header ref={headerRef} className={`fixed top-0 inset-x-0 z-50 transition-all ${scrolled ? 'backdrop-blur bg-background/70 border-b shadow-sm' : 'bg-transparent'} supports-[backdrop-filter]:bg-background/40`}>
-  <div className="container mx-auto px-4 h-16 flex items-center gap-6">
-        <Link to="/home" className="flex items-center">
-          <img src="/nav-kanan-3.png" alt="Lexigrain" className="h-10 sm:h-12 w-auto object-contain" />
-        </Link>
-        <nav className="hidden md:flex items-center gap-1">
-          {navItems.map(item => (
-            <a key={item.href} href={item.href} onClick={(e) => handleNavClick(e, item.href)} className="relative px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group">
-              <span>{item.label}</span>
-              <span className="absolute left-3 right-3 -bottom-0.5 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform origin-center" />
-            </a>
-          ))}
-        </nav>
-        <div className="flex-1" />
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        {/* Left: Logo + nav links */}
+        <div className="flex items-center gap-6">
+          <Link to="/home" className="flex items-center">
+            <img src="/nav-kanan-3.png" alt="Lexigrain" className="h-10 sm:h-12 w-auto object-contain" />
+          </Link>
+          <nav className="hidden md:flex items-center gap-1">
+            {navItems.map(item => (
+              <a key={item.href} href={item.href} onClick={(e) => handleNavClick(e, item.href)} className="relative px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group">
+                <span>{item.label}</span>
+                <span className="absolute left-3 right-3 -bottom-0.5 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform origin-center" />
+              </a>
+            ))}
+          </nav>
+        </div>
+
+        {/* Right: theme + auth buttons */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Link to="/auth/signin"><Button variant="ghost" size="sm">Log in</Button></Link>

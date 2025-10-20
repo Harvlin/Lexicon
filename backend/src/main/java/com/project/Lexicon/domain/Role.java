@@ -6,5 +6,5 @@ public enum Role {
     ProductManager,
     FinanceProfessional,
     Marketing,
-    Others
+    USER
 }

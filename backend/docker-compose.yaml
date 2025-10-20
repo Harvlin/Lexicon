@@ -8,7 +8,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: passwordindevelopment!
-      MYSQL_DATABASE: lexicon
+      MYSQL_DATABASE: lexigrain
   adminer:
     image: adminer:latest
     restart: always

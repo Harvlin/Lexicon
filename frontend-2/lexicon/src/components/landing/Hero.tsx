@@ -22,10 +22,12 @@ export function HeroSection(){
             </span>
           </motion.div>
           <motion.h1 initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:0.6, delay:0.1}} className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight">
-            Learn <span className="bg-gradient-hero bg-clip-text text-transparent">Smarter</span>. <span className="text-primary">Grow Faster.</span>
+            Learn <span className="bg-gradient-hero bg-clip-text text-transparent">Smarter</span>
+            <br/>
+            Grow <span className="bg-gradient-hero bg-clip-text text-transparent">Faster</span>
           </motion.h1>
           <motion.p initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:0.6, delay:0.2}} className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Your AI-powered learning assistant that summarizes, quizzes, and personalizes your study path — making knowledge stick faster than ever.
+            Your AI-powered learning assistant that summarizes, quizzes, and personalizes your study path.
           </motion.p>
           <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:0.6, delay:0.3}} className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button size="lg" className="text-lg px-8 py-6 bg-accent text-accent-foreground hover:opacity-90 transition-opacity shadow-elevated group">

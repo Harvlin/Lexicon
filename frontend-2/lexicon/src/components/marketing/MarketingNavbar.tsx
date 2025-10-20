@@ -46,32 +46,34 @@ export function MarketingNavbar() {
   };
 
   return (
-  <header className={`fixed top-0 inset-x-0 z-50 transition-all ${scrolled ? 'bg-background/80 backdrop-blur border-b shadow-sm' : 'bg-background/40 backdrop-blur-sm'} border-border`}>
-    <div className="max-w-7xl mx-auto px-4 flex h-16 items-center gap-6">
-        {/* Brand */}
-        <Link to="/home" className="flex items-center">
-          <img src="/nav-kanan-3.png" alt="Lexigrain" className="h-10 sm:h-12 w-auto object-contain" />
-        </Link>
+    <header className={`fixed top-0 inset-x-0 z-50 transition-all ${scrolled ? 'bg-background/80 backdrop-blur border-b shadow-sm' : 'bg-background/40 backdrop-blur-sm'} border-border`}>
+      <div className="max-w-7xl mx-auto px-4 flex h-16 items-center justify-between">
+        <div className="flex items-center gap-6">
+          {/* Brand */}
+          <Link to="/home" className="flex items-center">
+            <img src="/nav-kanan-3.png" alt="Lexigrain" className="h-10 sm:h-12 w-auto object-contain" />
+          </Link>
 
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-1 flex-1">
-          {NAV_SECTIONS.map(s => {
-            const is = active === s.id;
-            return (
-              <button
-                key={s.id}
-                onClick={(e) => handleClick(e, s.id)}
-                className={`relative px-4 py-2 text-sm font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${is ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                aria-current={is ? 'page' : undefined}
-              >
-                {s.label}
-                {is && <span className="absolute left-3 right-3 -bottom-0.5 h-0.5 rounded-full bg-primary" />}
-              </button>
-            );
-          })}
-        </nav>
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {NAV_SECTIONS.map(s => {
+              const is = active === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={(e) => handleClick(e, s.id)}
+                  className={`relative px-4 py-2 text-sm font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${is ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  aria-current={is ? 'page' : undefined}
+                >
+                  {s.label}
+                  {is && <span className="absolute left-3 right-3 -bottom-0.5 h-0.5 rounded-full bg-primary" />}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
-        {/* Auth Buttons + Theme */}
+        {/* Right: Auth Buttons + Theme */}
         <div className="hidden md:flex items-center gap-2">
           <ThemeToggle />
           <Link to="/auth/signin"><Button variant="ghost" size="sm">Sign in</Button></Link>
@@ -82,7 +84,7 @@ export function MarketingNavbar() {
         <div className="md:hidden flex items-center gap-1">
           <ThemeToggle />
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(o => !o)} aria-label="Toggle navigation">
-          {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </Button>
         </div>
       </div>

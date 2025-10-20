@@ -47,7 +47,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @RateLimit(key = "login", limit = 5, duration = 900) // 5 attempts per 15 minutes
+    @RateLimit(key = "login", limit = 5, duration = 600) // 5 attempts per 5 minutes
     public ResponseEntity<?> login(@Valid @RequestBody LoginDto dto) {
         try {
             AuthResponse response = authService.login(dto);

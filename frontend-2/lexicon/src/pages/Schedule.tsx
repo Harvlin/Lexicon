@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSchedule, getWeekId } from '@/hooks/useSchedule';
+import { useSchedule } from '@/hooks/useSchedule';
 import { mockLessons } from '@/lib/mockData';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, RefreshCcw, Plus, CheckCircle2, Clock, Loader2, Trash2, CalendarDays, Wand2, Info, SplitSquareHorizontal, ArrowRight, Target } from 'lucide-react';
-import useScrollReveal from '@/hooks/useScrollReveal';
+import { Calendar } from '@/components/ui/calendar';
+import { ChevronLeft, ChevronRight, RefreshCcw, Plus, CheckCircle2, Clock, Loader2, Trash2, CalendarDays, Settings, SplitSquareHorizontal, TrendingUp, Target, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/hooks/use-toast';
 
 function formatWeekLabel(weekId: string) {
   return weekId.replace('-W', ' • Week ');
@@ -22,521 +20,471 @@ function minutesToHhMm(m: number) {
   const h = Math.floor(m/60); const mm = m % 60; return `${h}h${mm ? ' ' + mm + 'm' : ''}`;
 }
 
-function startOfWeekISO(d: Date) {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = (day === 0 ? -6 : 1) - day;
-  date.setDate(date.getDate()+diff);
-  date.setHours(0,0,0,0);
-  return date;
-}
+function toISODate(d: Date) { return d.toISOString().substring(0,10); }
 
 export default function SchedulePage() {
-  useScrollReveal();
-  // @ts-ignore extended source field
+  // @ts-ignore source is an extra field for UI
   const { weekId, sessions, stats, addSession, deleteSession, setStatus, regenerateCurrentWeek, shiftWeek, splitWeekSessions, splitDaySessions, source } = useSchedule();
-  const [tab, setTab] = useState('week');
-  const [open, setOpen] = useState(false);
+
+  // Calendar + day focus
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const selectedISO = toISODate(selectedDate);
+
+  // Add session modal
+  const [openAdd, setOpenAdd] = useState(false);
   const [lessonId, setLessonId] = useState<string>('');
-  const [date, setDate] = useState<string>('');
   const [minutes, setMinutes] = useState<number>(60);
   const [submitting, setSubmitting] = useState(false);
 
-  // Onboarding-aligned schedule preferences
+  // Preferences modal (compact)
+  const [openPrefs, setOpenPrefs] = useState(false);
   const [schedulePreset, setSchedulePreset] = useState<string>('Evening');
   const [daysOfWeek, setDaysOfWeek] = useState<string[]>(['Mon','Tue','Wed','Thu','Fri']);
   const [specificTime, setSpecificTime] = useState<string>('19:00');
   const [dailyHours, setDailyHours] = useState<number>(1);
-  const [goals, setGoals] = useState<string[]>([]);
-  const [skills, setSkills] = useState<string[]>([]);
   const [reminderEnabled, setReminderEnabled] = useState<boolean>(false);
-  const [mode, setMode] = useState<'easy' | 'advanced'>('easy');
-  const { toast } = useToast();
 
-  // Load onboarding preferences on mount
+  // Load onboarding preferences
   useEffect(() => {
     try {
-  let raw = localStorage.getItem('lexigrain:onboarding');
-  if (!raw) raw = localStorage.getItem('lexicon:onboarding');
+      let raw = localStorage.getItem('lexigrain:onboarding') || localStorage.getItem('lexicon:onboarding');
       if (!raw) return;
-      const parsed = JSON.parse(raw);
-      setSchedulePreset(parsed.schedulePreset ?? parsed.preferredTime ?? 'Evening');
-      setDaysOfWeek(Array.isArray(parsed.daysOfWeek) ? parsed.daysOfWeek : []);
-      setSpecificTime(parsed.specificTime ?? '19:00');
-      setDailyHours(parsed.dailyHours ?? 1);
-      setGoals(parsed.goals ?? []);
-      setSkills(parsed.skills ?? []);
-      setReminderEnabled(!!parsed.reminderEnabled);
-    } catch (e) { }
+      const p = JSON.parse(raw);
+      setSchedulePreset(p.schedulePreset ?? p.preferredTime ?? 'Evening');
+      setDaysOfWeek(Array.isArray(p.daysOfWeek) ? p.daysOfWeek : ['Mon','Tue','Wed','Thu','Fri']);
+      setSpecificTime(p.specificTime ?? '19:00');
+      setDailyHours(p.dailyHours ?? 1);
+      setReminderEnabled(!!p.reminderEnabled);
+    } catch {}
   }, []);
 
-  const DAY_OPTIONS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const savePreferences = () => {
+    try {
+      const raw = localStorage.getItem('lexigrain:onboarding') || localStorage.getItem('lexicon:onboarding');
+      const prev = raw ? JSON.parse(raw) : {};
+      const next = { ...prev, schedulePreset, daysOfWeek, specificTime, dailyHours, reminderEnabled };
+      try { localStorage.setItem('lexigrain:onboarding', JSON.stringify(next)); } catch {}
+    } catch {}
+  };
 
   const lessonsById = useMemo(() => Object.fromEntries(mockLessons.map(l => [l.id, l])), []);
 
-  const days = useMemo(() => {
-    // Derive monday from current weekId
-    const parts = weekId.split('-W');
-    let currentMonday = startOfWeekISO(new Date());
-    if (parts.length === 2) {
-      // Reconstruct approximate monday by scanning dates nearby
-      const year = Number(parts[0]);
-      const week = Number(parts[1]);
-      // Use helper: find Monday of week 1 then offset
-      const jan4 = new Date(year,0,4);
-      const day = jan4.getDay() || 7;
-      const mondayWeek1 = new Date(jan4);
-      mondayWeek1.setDate(jan4.getDate() + (1 - day));
-      currentMonday = new Date(mondayWeek1);
-      currentMonday.setDate(mondayWeek1.getDate() + (week - 1)*7);
-    }
-    const emptyDays: { date: string; sessions: typeof sessions }[] = [];
-    for (let i=0;i<7;i++) {
-      const d = new Date(currentMonday);
-      d.setDate(currentMonday.getDate()+i);
-      emptyDays.push({ date: d.toISOString().substring(0,10), sessions: [] });
-    }
-    const map: Record<string, ReturnType<typeof buildDay>> = Object.fromEntries(emptyDays.map(d => [d.date, { ...d }]));
-    sessions.forEach(s => {
-      if (!map[s.date]) map[s.date] = buildDay(s.date);
-      map[s.date].sessions.push(s);
-    });
-    return Object.values(map).sort((a,b) => a.date.localeCompare(b.date));
-  }, [sessions]);
+  const daySessions = useMemo(() => sessions.filter(s => s.date === selectedISO).sort((a,b) => a.createdAt.localeCompare(b.createdAt)), [sessions, selectedISO]);
 
-  function buildDay(date: string) { return { date, sessions: [] as typeof sessions } }
-
-  // derive mini-week stats for glance panel
-  const glance = useMemo(() => {
-    const byDate: Record<string, number> = {};
-    sessions.forEach(s => { byDate[s.date] = (byDate[s.date] ?? 0) + (s.status === 'done' ? 1 : 0); });
-    const totalSessions = sessions.length;
-    const done = sessions.filter(s => s.status === 'done').length;
-    const remaining = totalSessions - done;
-    return { byDate, totalSessions, done, remaining };
-  }, [sessions]);
-
-  // What next calculation: pick next planned session today or next day
-  const nextSession = useMemo(() => {
-    const now = new Date();
-    const todayISO = new Date().toISOString().substring(0,10);
-    const upcoming = sessions
-      .filter(s => s.status !== 'done')
-      .sort((a,b) => a.date.localeCompare(b.date));
-    const today = upcoming.find(s => s.date === todayISO) ?? upcoming[0];
-    return today;
-  }, [sessions]);
+  const hasSessionsDates = useMemo(() => new Set(sessions.map(s => s.date)), [sessions]);
+  const completedDates = useMemo(() => new Set(sessions.filter(s => s.status==='done').map(s => s.date)), [sessions]);
 
   const handleAdd = async () => {
-    if (!lessonId || !date) return;
+    if (!lessonId) return;
     setSubmitting(true);
-    addSession({ lessonId, date, plannedMinutes: minutes });
+    addSession({ lessonId, date: selectedISO, plannedMinutes: minutes });
     setSubmitting(false);
-    setOpen(false);
-    setLessonId(''); setDate(''); setMinutes(60);
+    setOpenAdd(false);
+    setLessonId(''); setMinutes(60);
   };
 
-  // Persist schedule preferences back to onboarding storage
-  const savePreferences = () => {
-    try {
-  const raw = localStorage.getItem('lexigrain:onboarding') || localStorage.getItem('lexicon:onboarding');
-      const prev = raw ? JSON.parse(raw) : {};
-      const next = {
-        ...prev,
-        schedulePreset,
-        daysOfWeek,
-        specificTime,
-        dailyHours,
-        reminderEnabled,
-      };
-  try { localStorage.setItem('lexigrain:onboarding', JSON.stringify(next)); } catch {}
-      toast({ title: 'Saved', description: 'Your schedule preferences have been saved.' });
-    } catch (e) { }
-  };
+  // If selected day has no sessions but there are sessions in the week, focus earliest session date
+  useEffect(() => {
+    if (sessions.length > 0 && daySessions.length === 0) {
+      const earliest = sessions.slice().sort((a,b) => a.date.localeCompare(b.date))[0];
+      if (earliest) {
+        const newDate = new Date(earliest.date);
+        if (!Number.isNaN(newDate.getTime())) setSelectedDate(newDate);
+      }
+    }
+  }, [sessions, daySessions.length]);
 
-  // Simple AI-like suggestions (heuristic)
-  const aiSuggestions = useMemo(() => {
-    const suggestions: { title: string; description: string; apply: () => void }[] = [];
-    if (goals.some(g => /career|exam/i.test(g))) {
-      suggestions.push({
-        title: 'Morning Focus (Weekdays)',
-        description: 'Shift to weekday mornings to maximize focus and consistency.',
-        apply: () => { setSchedulePreset('Custom'); setDaysOfWeek(['Mon','Tue','Wed','Thu','Fri']); setSpecificTime('07:30'); }
-      });
-    }
-    if (dailyHours > 2) {
-      suggestions.push({
-        title: 'Split Sessions',
-        description: 'Do two shorter sessions (60–90 min) on the same days for better retention.',
-        apply: () => { setSchedulePreset('Custom'); if (daysOfWeek.length===0) setDaysOfWeek(['Mon','Wed','Fri']); setSpecificTime('10:00'); }
-      });
-    }
-    if (skills.some(s => /machine learning|data/i.test(s))) {
-      suggestions.push({
-        title: 'Deep Work Blocks',
-        description: 'Choose 2–3 days with longer blocks (2+ hours) for complex topics.',
-        apply: () => { setSchedulePreset('Custom'); setDaysOfWeek(['Tue','Thu','Sat']); setSpecificTime('09:00'); setDailyHours(Math.max(dailyHours, 2)); }
-      });
-    }
-    return suggestions;
-  }, [goals, skills, dailyHours, daysOfWeek]);
-
-  // shiftWeek now provided by hook
+  const completedCount = sessions.filter(s => s.status === 'done').length;
 
   return (
-    <div className="space-y-8" data-reveal>
-      {/* This week at a glance */}
-      <Card className="bg-gradient-to-br from-card/70 to-background border-border/60">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2"><Target className="h-4 w-4 text-secondary"/> This week at a glance</span>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-[10px]">{sessions.length} sessions</Badge>
-              <Badge variant="outline" className="text-[10px]">{Math.round(stats.completionRate*100)}% complete</Badge>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="relative grid place-items-center h-16 w-16 rounded-full border">
-              <div className="text-sm font-semibold">{Math.round(stats.completionRate*100)}%</div>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <div><span className="font-medium text-foreground">{minutesToHhMm(stats.plannedMinutes)}</span> planned</div>
-              <div><span className="font-medium text-foreground">{glance.done}</span> done • <span className="font-medium text-foreground">{glance.remaining}</span> to go</div>
+    <div className="min-h-screen bg-background pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Enhanced Header */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-primary p-8 shadow-2xl">
+          <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,rgba(255,255,255,0.6))]"></div>
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="text-white">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
+                    <CalendarDays className="h-7 w-7" />
+                  </div>
+                  <h1 className="text-4xl font-heading font-bold tracking-tight">Your Schedule</h1>
+                  {source === 'mock' && (
+                    <span className="inline-flex items-center rounded-full bg-yellow-400/90 text-yellow-900 px-3 py-1 text-xs font-bold tracking-wide uppercase shadow-lg">
+                      Demo Mode
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-white/90">
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-white"></span>
+                    {formatWeekLabel(weekId)}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <Target className="h-4 w-4" />
+                    {sessions.length} sessions
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <Clock className="h-4 w-4" />
+                    {minutesToHhMm(stats.plannedMinutes)} planned
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <TrendingUp className="h-4 w-4" />
+                    {Math.round(stats.completionRate*100)}% complete
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1 bg-white/10 backdrop-blur-sm rounded-lg p-1">
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-white/20" onClick={() => shiftWeek(-1)}>
+                    <ChevronLeft className="h-4 w-4"/>
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-white/20" onClick={() => shiftWeek(1)}>
+                    <ChevronRight className="h-4 w-4"/>
+                  </Button>
+                </div>
+                <Button variant="default" onClick={() => { savePreferences(); regenerateCurrentWeek(); }} className="gap-2 shadow-lg">
+                  <RefreshCcw className="h-4 w-4"/> Regenerate
+                </Button>
+                <Button variant="secondary" onClick={() => splitWeekSessions()} className="gap-2 shadow-lg">
+                  <SplitSquareHorizontal className="h-4 w-4"/> Split
+                </Button>
+                <Dialog open={openPrefs} onOpenChange={setOpenPrefs}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2 shadow-lg">
+                      <Settings className="h-4 w-4"/> Settings
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-heading flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-accent" />
+                        Study Preferences
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="grid sm:grid-cols-2 gap-4 py-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">Preset</label>
+                        <Select value={schedulePreset} onValueChange={setSchedulePreset}>
+                          <SelectTrigger className="h-11"><SelectValue placeholder="Select preset"/></SelectTrigger>
+                          <SelectContent>
+                            {['Morning','Afternoon','Evening','Late Night','Custom'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">Daily hours</label>
+                        <Input type="number" min={0.5} step={0.5} max={12} value={dailyHours} onChange={e => setDailyHours(parseFloat(e.target.value)||1)} className="h-11" />
+                      </div>
+                      {schedulePreset === 'Custom' && (
+                        <div className="sm:col-span-2 space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground">Days of Week</label>
+                          <div className="flex flex-wrap gap-2">
+                            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => {
+                              const active = daysOfWeek.includes(d);
+                              return (
+                                <button key={d} type="button" onClick={() => setDaysOfWeek(active ? daysOfWeek.filter(x=>x!==d) : [...daysOfWeek, d])} className={cn(
+                                  'px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all',
+                                  active 
+                                    ? 'border-primary bg-primary/10 text-primary shadow-sm' 
+                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                )}>
+                                  {d}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {schedulePreset === 'Custom' && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground">Time</label>
+                          <Input type="time" value={specificTime} onChange={e => setSpecificTime(e.target.value)} className="h-11" />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3 sm:col-span-2 p-4 rounded-lg bg-muted/50">
+                        <Switch id="reminders2" checked={reminderEnabled} onCheckedChange={(v)=> setReminderEnabled(!!v)} />
+                        <label htmlFor="reminders2" className="text-sm font-medium">Enable study reminders</label>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2 border-t">
+                      <Button variant="outline" onClick={savePreferences}>Save Changes</Button>
+                      <Button onClick={() => { savePreferences(); regenerateCurrentWeek(); setOpenPrefs(false); }} className="bg-gradient-primary text-primary-foreground">
+                        Apply to Week
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 shadow-lg">
+                      <Plus className="h-4 w-4"/> Add Session
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-heading">New Study Session</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Select Lesson</label>
+                        <Select value={lessonId} onValueChange={v => setLessonId(v)}>
+                          <SelectTrigger className="h-11"><SelectValue placeholder="Choose a lesson" /></SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            {mockLessons.map(l => (
+                              <SelectItem value={l.id} key={l.id}>{l.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Planned Duration</label>
+                        <Input type="number" value={minutes} min={15} step={15} onChange={e => setMinutes(Number(e.target.value)||60)} className="h-11" />
+                        <p className="text-xs text-muted-foreground">In minutes (e.g., 60 = 1 hour)</p>
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <Button onClick={handleAdd} disabled={submitting || !lessonId} className="gap-2 bg-gradient-primary text-primary-foreground">
+                          {submitting && <Loader2 className="h-4 w-4 animate-spin"/>}
+                          Create Session
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </div>
-          <div className="flex-1">
-            <div className="grid grid-cols-7 gap-1">
-              {days.map((d, idx) => {
-                const doneCount = d.sessions.filter(s => s.status==='done').length;
-                const total = d.sessions.length;
-                const label = new Date(d.date).toLocaleDateString(undefined,{ weekday:'short'});
+        </div>
+
+        {/* Empty state when no sessions */}
+        {sessions.length === 0 ? (
+          <Card className="border-2 border-dashed shadow-xl">
+            <CardContent className="py-16 text-center space-y-6">
+              <div className="mx-auto w-20 h-20 bg-[hsl(var(--primary)/0.12)] dark:bg-[hsl(var(--primary)/0.15)] rounded-2xl flex items-center justify-center">
+                <CalendarDays className="h-10 w-10 text-[hsl(var(--primary))]" />
+              </div>
+              <div className="space-y-2">
+                <div className="text-3xl font-heading font-bold bg-gradient-hero bg-clip-text text-transparent">
+                  Plan Your First Study Session
+                </div>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Use the calendar to pick a date and add a session, or let the app generate a balanced week from your preferences.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <Button size="lg" className="gap-2 bg-gradient-primary text-white shadow-lg hover:shadow-xl transition-all" onClick={() => setOpenAdd(true)}>
+                  <Plus className="h-5 w-5"/> Add Session
+                </Button>
+                <Button size="lg" variant="outline" className="gap-2 border-2" onClick={() => { savePreferences(); regenerateCurrentWeek(); }}>
+                  <RefreshCcw className="h-5 w-5"/> Generate Week
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {/* Main content grid */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Calendar */}
+          <Card className="lg:col-span-1 shadow-xl border-0 overflow-hidden bg-card">
+            <CardHeader className="pb-3 border-b bg-muted">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-primary" />
+                Calendar
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(d) => d && setSelectedDate(d)}
+                modifiers={{
+                  hasSessions: (date) => hasSessionsDates.has(toISODate(date)),
+                  completed: (date) => completedDates.has(toISODate(date)),
+                }}
+                modifiersClassNames={{
+                  hasSessions: 'ring-2 ring-ring/50 ring-offset-2 rounded-lg font-semibold',
+                  completed: 'bg-success/20 text-success font-bold',
+                }}
+                className="rounded-lg"
+              />
+              <div className="flex items-center gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-4 w-4 ring-2 ring-ring/50 rounded"></span>
+                  <span>Planned</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-4 w-4 bg-success/20 rounded"></span>
+                  <span>Completed</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Day agenda */}
+          <Card className="lg:col-span-1 shadow-xl border-0 overflow-hidden bg-card">
+            <CardHeader className="pb-3 border-b bg-muted">
+              <CardTitle className="text-lg font-semibold">
+                {selectedDate.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3 max-h-[500px] overflow-y-auto">
+              {daySessions.map((s, idx) => {
+                const lesson = lessonsById[s.lessonId];
                 return (
-                  <div key={d.date} className={cn('rounded-md px-2 py-2 border text-center text-xs', total===0 ? 'text-muted-foreground border-dashed' : doneCount===total ? 'bg-success/10 border-success/40' : 'border-border')}
-                       title={`${label}: ${doneCount}/${total}`}>
-                    <div className="font-medium">{label[0]}</div>
-                    <div className="text-[10px]">
-                      {total>0 ? `${doneCount}/${total}` : '-'}
-                    </div>
-                    {/* per-day split quick action when day has exactly 1 long session */}
-                    {total===1 && d.sessions[0].plannedMinutes>=120 && (
-                      <button className="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:underline" onClick={()=> splitDaySessions(d.date)}>
-                        <SplitSquareHorizontal className="h-3 w-3"/> Split
-                      </button>
+                  <div 
+                    key={s.id} 
+                    className={cn(
+                      'rounded-xl border-2 p-4 group text-sm transition-all duration-300 hover:shadow-lg',
+                      s.status==='done' 
+                        ? 'bg-success/10 border-success/50' 
+                        : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700 hover:border-primary dark:hover:border-primary'
                     )}
+                    style={{ animationDelay: `${idx * 50}ms` }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 space-y-2">
+                        <div className="font-semibold leading-snug line-clamp-2 text-base">{lesson?.title || 'Lesson'}</div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {minutesToHhMm(s.plannedMinutes)}
+                          </span>
+                          <Badge variant={s.status === 'done' ? 'default' : 'secondary'} className="text-[10px] font-medium">
+                            {s.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Button 
+                          size="sm" 
+                          variant={s.status==='done' ? 'default':'outline'} 
+                          onClick={() => setStatus(s.id, s.status==='done' ? 'planned' : 'done')} 
+                          className={cn(
+                            'h-8 text-xs font-medium transition-all',
+                            s.status === 'done' && 'bg-success hover:brightness-95 text-white'
+                          )}
+                        >
+                          {s.status==='done' ? <><CheckCircle2 className="h-3 w-3 mr-1"/>Done</> : 'Complete'}
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => deleteSession(s.id)} 
+                          className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                        >
+                          <Trash2 className="h-3.5 w-3.5"/>
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 min-w-[180px]">
-            <Button variant="secondary" className="gap-2" onClick={() => splitWeekSessions()}>
-              <SplitSquareHorizontal className="h-4 w-4"/> Split long sessions
-            </Button>
-            {nextSession && (
-              <Button className="gap-2" onClick={() => setStatus(nextSession.id, 'in-progress')}>
-                <ArrowRight className="h-4 w-4"/> Start next: {minutesToHhMm(nextSession.plannedMinutes)}
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Schedule Intro & Preferences */}
-      <Card className="bg-card/60">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <CardTitle className="flex items-center gap-2"><Info className="h-4 w-4 text-primary"/> Your Schedule Preferences</CardTitle>
-            <div className="flex items-center gap-2 text-sm">
-              <span className={mode==='easy' ? 'font-semibold' : 'text-muted-foreground'}>Easy Mode</span>
-              <Switch checked={mode==='advanced'} onCheckedChange={(v)=> setMode(v ? 'advanced':'easy')} aria-label="Toggle advanced mode" />
-              <span className={mode==='advanced' ? 'font-semibold' : 'text-muted-foreground'}>Advanced</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {mode==='easy' && (
-            <div className="space-y-4">
-              <ol className="text-sm text-muted-foreground list-decimal ml-5 space-y-1">
-                <li>Choose your study days</li>
-                <li>Select the time of day</li>
-                <li>Pick how long you want to study</li>
-              </ol>
-              {/* Days presets */}
-              <div>
-                <p className="text-sm font-medium mb-2">Days</p>
-                <div className="grid sm:grid-cols-3 gap-2">
-                  {[
-                    { label: 'Every Day', days: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
-                    { label: 'Weekdays', days: ['Mon','Tue','Wed','Thu','Fri'] },
-                    { label: 'Weekends', days: ['Sat','Sun'] },
-                  ].map(opt => (
-                    <Button key={opt.label} type="button" variant={daysOfWeek.join(',')===opt.days.join(',') ? 'default' : 'outline'} className={daysOfWeek.join(',')===opt.days.join(',') ? 'bg-accent hover:bg-accent-hover' : ''}
-                      onClick={() => { setSchedulePreset('Custom'); setDaysOfWeek(opt.days); }}>
-                      {opt.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              {/* Time presets */}
-              <div>
-                <p className="text-sm font-medium mb-2">Time of day</p>
-                <div className="grid sm:grid-cols-4 gap-2">
-                  {[
-                    { label: 'Morning', preset: 'Morning', time: '07:30' },
-                    { label: 'Afternoon', preset: 'Afternoon', time: '13:00' },
-                    { label: 'Evening', preset: 'Evening', time: '19:00' },
-                    { label: 'Late Night', preset: 'Late Night', time: '21:00' },
-                  ].map(opt => (
-                    <Button key={opt.label} type="button" variant={schedulePreset===opt.preset ? 'default' : 'outline'} className={schedulePreset===opt.preset ? 'bg-primary hover:bg-primary-hover' : ''}
-                      onClick={() => { setSchedulePreset(opt.preset); setSpecificTime(opt.time); }}>
-                      {opt.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              {/* Duration presets */}
-              <div>
-                <p className="text-sm font-medium mb-2">Study time per day</p>
-                <div className="flex flex-wrap gap-2">
-                  {[0.5, 1, 1.5, 2].map(v => (
-                    <Button key={v} type="button" variant={dailyHours===v ? 'default' : 'outline'} className={dailyHours===v ? 'bg-secondary hover:bg-secondary/80' : ''} onClick={() => setDailyHours(v)}>
-                      {v === 0.5 ? '30 min' : `${v} ${v===1 ? 'hour' : 'hours'}`}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              {/* Reminders */}
-              <div className="flex items-center gap-3">
-                <Switch id="reminders" checked={reminderEnabled} onCheckedChange={(v)=> setReminderEnabled(!!v)} />
-                <label htmlFor="reminders" className="text-sm">Send me gentle reminders</label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={savePreferences}>Save</Button>
-                <Button className="gap-1" onClick={() => { savePreferences(); regenerateCurrentWeek(); toast({ title: 'Applied', description: 'This week has been updated.' }); }}>Apply to This Week</Button>
-              </div>
-              <p className="text-xs text-muted-foreground">You can always switch to Advanced for more control. Your choices follow the app’s color palette for clarity and consistency.</p>
-            </div>
-          )}
-          {mode==='advanced' && (
-            <div className="space-y-4">
-              <div className="grid md:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground">Preset</label>
-                  <Select value={schedulePreset} onValueChange={setSchedulePreset}>
-                    <SelectTrigger><SelectValue placeholder="Select preset"/></SelectTrigger>
-                    <SelectContent>
-                      {['Morning','Afternoon','Evening','Late Night','Custom'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Daily Hours</label>
-                  <Input type="number" min={0.5} step={0.5} max={12} value={dailyHours} onChange={e => setDailyHours(parseFloat(e.target.value)||1)} />
-                </div>
-                {schedulePreset === 'Custom' && (
-                  <div className="md:col-span-2">
-                    <label className="text-xs text-muted-foreground">Days</label>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {DAY_OPTIONS.map(d => {
-                        const active = daysOfWeek.includes(d);
-                        return (
-                          <button key={d} type="button" onClick={() => setDaysOfWeek(active ? daysOfWeek.filter(x=>x!==d) : [...daysOfWeek, d])} className={`px-3 py-1.5 rounded-md border text-sm transition ${active ? 'border-primary bg-primary/10 text-primary' : 'border-muted text-foreground'} hover:border-foreground/40`}>
-                            {d}
-                          </button>
-                        );
-                      })}
-                    </div>
+              {daySessions.length===0 && (
+                <div className="text-center py-12 space-y-3">
+                  <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                    <CalendarDays className="h-8 w-8 text-gray-400" />
                   </div>
-                )}
-                {schedulePreset === 'Custom' && (
-                  <div>
-                    <label className="text-xs text-muted-foreground">Time</label>
-                    <Input type="time" value={specificTime} onChange={e => setSpecificTime(e.target.value)} />
-                  </div>
-                )}
-                <div className="flex items-center gap-3 md:col-span-4">
-                  <Switch id="reminders2" checked={reminderEnabled} onCheckedChange={(v)=> setReminderEnabled(!!v)} />
-                  <label htmlFor="reminders2" className="text-sm">Reminders</label>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={savePreferences}>Save Preferences</Button>
-                <Button className="gap-1" onClick={() => { savePreferences(); regenerateCurrentWeek(); toast({ title: 'Applied', description: 'This week has been updated.' }); }}><RefreshCcw className="h-4 w-4"/> Apply to This Week</Button>
-              </div>
-              {aiSuggestions.length > 0 && (
-                <div className="rounded-lg border p-3">
-                  <div className="flex items-center gap-2 mb-2"><Wand2 className="h-4 w-4 text-secondary"/><span className="text-sm font-medium">AI Suggestions</span></div>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    {aiSuggestions.map(s => (
-                      <Button key={s.title} variant="secondary" className="justify-start" onClick={() => { s.apply(); savePreferences(); toast({ title: 'Suggestion applied' }); }}>
-                        {s.title}
-                      </Button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">These suggestions use your goals, skills, and daily hours to propose better study times. No data leaves your device.</p>
+                  <p className="text-sm text-muted-foreground">No sessions scheduled for this day.</p>
                 </div>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <CalendarDays className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-heading font-bold">Study Schedule</h1>
-          </div>
-          <p className="text-muted-foreground text-sm flex items-center gap-2 flex-wrap">{formatWeekLabel(weekId)} • {sessions.length} sessions • {minutesToHhMm(stats.plannedMinutes)} planned • {Math.round(stats.completionRate*100)}% done {source === 'mock' && <span className="inline-flex items-center rounded-full bg-warning/20 text-warning px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">Mock Data</span>}</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => shiftWeek(-1)}><ChevronLeft className="h-4 w-4"/></Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => shiftWeek(1)}><ChevronRight className="h-4 w-4"/></Button>
-          </div>
-          <Button variant="outline" onClick={() => { savePreferences(); regenerateCurrentWeek(); }} className="gap-1"><RefreshCcw className="h-4 w-4"/> Regenerate</Button>
-          <Button variant="outline" onClick={() => splitWeekSessions()} className="gap-1"><SplitSquareHorizontal className="h-4 w-4"/> Split Sessions</Button>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-1"><Plus className="h-4 w-4"/> Add Session</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New Session</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Select value={lessonId} onValueChange={v => setLessonId(v)}>
-                  <SelectTrigger><SelectValue placeholder="Select lesson" /></SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {mockLessons.map(l => (
-                      <SelectItem value={l.id} key={l.id}>{l.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Planned Minutes</label>
-                  <Input type="number" value={minutes} min={15} step={15} onChange={e => setMinutes(Number(e.target.value))} />
-                </div>
-                <div className="flex justify-end">
-                  <Button onClick={handleAdd} disabled={submitting || !lessonId || !date} className="gap-1">
-                    {submitting && <Loader2 className="h-4 w-4 animate-spin"/>}
-                    Save
-                  </Button>
-                </div>
+              <div className="flex justify-end pt-2">
+                <Button variant="outline" className="gap-2 text-xs" onClick={() => splitDaySessions(selectedISO)}>
+                  <SplitSquareHorizontal className="h-3 w-3"/> Split Long Sessions
+                </Button>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList>
-          <TabsTrigger value="week">Week</TabsTrigger>
-          <TabsTrigger value="list">List</TabsTrigger>
-          <TabsTrigger value="stats">Stats</TabsTrigger>
-          <TabsTrigger value="next">What next</TabsTrigger>
-        </TabsList>
-        <TabsContent value="week" className="mt-6">
-          <div className="grid md:grid-cols-7 gap-4">
-            {days.map(d => (
-              <Card key={d.date} className="flex flex-col">
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm font-semibold flex items-center justify-between">
-                    <span>{new Date(d.date).toLocaleDateString(undefined,{ weekday:'short', month:'short', day:'numeric'})}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 space-y-3 p-3">
-                  {d.sessions.map(s => {
-                    const lesson = lessonsById[s.lessonId];
-                    return (
-                      <div key={s.id} className={cn('rounded-md border p-2 group text-xs space-y-1', s.status==='done' && 'bg-success/10 border-success/40')}> 
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium leading-tight line-clamp-2">{lesson?.title || 'Lesson'}</span>
-                          <button onClick={() => deleteSession(s.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive"><Trash2 className="h-3 w-3"/></button>
-                        </div>
-                        <div className="flex items-center justify-between text-muted-foreground">
-                          <span>{minutesToHhMm(s.plannedMinutes)}</span>
-                          <div className="flex gap-1">
-                            <Badge variant={s.status==='done' ? 'default':'outline'} className="px-1 py-0 text-[10px] cursor-pointer" onClick={() => setStatus(s.id, s.status==='done' ? 'planned' : 'done')}>
-                              {s.status==='done' ? <CheckCircle2 className="h-3 w-3"/> : 'Mark'}
-                            </Badge>
-                            {s.focusTag && <Badge variant="secondary" className="px-1 py-0 text-[10px]">{s.focusTag}</Badge>}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {d.sessions.length === 0 && <div className="text-muted-foreground text-xs italic border border-dashed rounded p-2 text-center">No sessions yet</div>}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="list" className="mt-6">
-          <div className="space-y-3">
-            {sessions.map(s => {
-              const lesson = lessonsById[s.lessonId];
-              return (
-                <Card key={s.id} className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="font-medium text-sm">{lesson?.title}</p>
-                      <p className="text-xs text-muted-foreground">{s.date} • {minutesToHhMm(s.plannedMinutes)} • {s.status}</p>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <Button size="sm" variant={s.status==='done' ? 'secondary':'outline'} onClick={() => setStatus(s.id, s.status==='done' ? 'planned' : 'done')} className="h-7 text-xs">{s.status==='done' ? 'Undo':'Complete'}</Button>
-                      <Button size="icon" variant="ghost" onClick={() => deleteSession(s.id)} className="h-7 w-7 text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-            {sessions.length===0 && <div className="text-sm text-muted-foreground border border-dashed rounded p-6 text-center">No sessions planned yet. Use <span className="font-medium">Add Session</span> to get started.</div>}
-          </div>
-        </TabsContent>
-        <TabsContent value="stats" className="mt-6">
-          <div className="grid md:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Clock className="h-4 w-4"/> Planned Time</CardTitle></CardHeader>
-              <CardContent className="text-3xl font-heading font-bold">{minutesToHhMm(stats.plannedMinutes)}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle2 className="h-4 w-4"/> Completed</CardTitle></CardHeader>
-              <CardContent className="text-3xl font-heading font-bold">{minutesToHhMm(stats.completedMinutes)}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2">Rate</CardTitle></CardHeader>
-              <CardContent className="text-3xl font-heading font-bold">{Math.round(stats.completionRate*100)}%</CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        <TabsContent value="next" className="mt-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2"><ArrowRight className="h-4 w-4"/> What next</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {nextSession ? (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">{lessonsById[nextSession.lessonId]?.title ?? 'Next session'}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(nextSession.date).toLocaleDateString()} • {minutesToHhMm(nextSession.plannedMinutes)} • {nextSession.focusTag ?? 'focus'}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={() => setStatus(nextSession.id, 'in-progress')} className="gap-1"><ArrowRight className="h-4 w-4"/> Start</Button>
-                    <Button variant="outline" onClick={() => splitDaySessions(nextSession.date)} className="gap-1"><SplitSquareHorizontal className="h-4 w-4"/> Split</Button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">You're all caught up. Nice work!</p>
-              )}
-              <p className="text-xs text-muted-foreground">Tip: Split longer sessions to keep energy high. Apply your preferences to regenerate a better-balanced week.</p>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+
+          {/* Week summary */}
+          <div className="lg:col-span-1 space-y-4">
+            <Card className="shadow-xl border-0 overflow-hidden bg-gradient-primary text-primary-foreground">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  This Week's Progress
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="text-4xl font-heading font-bold mb-1">{minutesToHhMm(stats.plannedMinutes)}</div>
+                  <div className="text-white/80 text-sm">Total planned time</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/20">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <div className="text-2xl font-bold">{sessions.length}</div>
+                    <div className="text-xs text-white/80">Sessions</div>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <div className="text-2xl font-bold">{completedCount}</div>
+                    <div className="text-xs text-white/80">Completed</div>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-white/80">Completion</span>
+                    <span className="font-bold">{Math.round(stats.completionRate*100)}%</span>
+                  </div>
+                  <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-success transition-all duration-500 rounded-full"
+                      style={{ width: `${Math.round(stats.completionRate*100)}%` }}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-xl border-0 overflow-hidden bg-card">
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <Target className="h-5 w-5 text-primary" />
+                  All Sessions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-2 max-h-[280px] overflow-y-auto">
+                {sessions.map((s) => {
+                  const lesson = lessonsById[s.lessonId];
+                  const isSelected = s.date === selectedISO;
+                  return (
+                    <button 
+                      key={s.id} 
+                      onClick={() => setSelectedDate(new Date(s.date))} 
+                      className={cn(
+                        'w-full text-left rounded-lg border-2 px-3 py-2.5 text-xs hover:shadow-md transition-all duration-200',
+                        isSelected 
+                          ? 'border-primary bg-primary/10 dark:bg-primary/15 shadow-sm' 
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold truncate">{lesson?.title ?? 'Lesson'}</span>
+                        {s.status === 'done' && <CheckCircle2 className="h-3 w-3 text-success flex-shrink-0" />}
+                      </div>
+                      <div className="text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                        <span>{new Date(s.date).toLocaleDateString(undefined,{ month:'short', day:'numeric'})}</span>
+                        <span>•</span>
+                        <span>{minutesToHhMm(s.plannedMinutes)}</span>
+                        <span>•</span>
+                        <Badge variant={s.status === 'done' ? 'default' : 'secondary'} className="text-[9px] h-4 px-1.5">
+                          {s.status}
+                        </Badge>
+                      </div>
+                    </button>
+                  );
+                })}
+                {sessions.length===0 && (
+                  <div className="text-center py-8 space-y-2">
+                    <div className="text-sm text-muted-foreground">No sessions planned yet.</div>
+                    <p className="text-xs text-muted-foreground">Add your first session to get started!</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
