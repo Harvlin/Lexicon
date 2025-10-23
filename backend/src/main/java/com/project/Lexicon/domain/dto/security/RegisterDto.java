@@ -25,9 +25,9 @@ public class RegisterDto {
     @NotNull(message = "Password is required")
     private String password;
 
-    @NotNull(message = "Role is required")
+    // Optional during initial signup; defaults to USER server-side
     private Role role;
 
-    @NotNull(message = "Goals list is required")
+    // Optional during initial signup; can be filled in onboarding
     private List<@NotBlank(message = "Each goal must be non-blank") String> goals;
 }

@@ -24,11 +24,11 @@ export default function ProgressPage() {
       .catch(() => setProgress(mockProgress));
     // Optional: fetch completed/in-progress lessons; fallback to mock
     endpoints.lessons
-      .list({ completed: true, size: 50 })
+      .list({ completed: true, limit: 50 })
       .then((res) => setCompleted(res.items))
       .catch(() => setCompleted(mockLessons.filter((l) => l.progress === 100)));
     endpoints.lessons
-      .list({ inProgress: true, size: 50 })
+      .list({ inProgress: true, limit: 50 })
       .then((res) => setInProgress(res.items))
       .catch(() => setInProgress(mockLessons.filter((l) => l.progress > 0 && l.progress < 100)));
   }, []);

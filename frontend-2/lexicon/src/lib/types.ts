@@ -104,3 +104,42 @@ export interface ScheduleWeekDTO {
   sessions: ScheduleSessionDTO[];
   source?: 'api' | 'onboarding' | 'mock';
 }
+
+// AI Chat
+export interface ChatRequestDTO {
+  prompt: string;
+  lessonId?: string;
+  history?: { role: 'user' | 'assistant'; content: string }[];
+}
+
+export interface ChatMessageDTO {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string; // ISO
+}
+
+// User preferences / settings
+export interface NotificationPrefsDTO {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  weeklyDigest: boolean;
+  marketingEmails: boolean;
+}
+
+// Auth
+export interface AuthResponseDTO {
+  token: string;           // JWT access token
+  tokenType?: string;      // e.g., "Bearer"
+  user?: UserDTO;          // optional current user payload
+  // Backend may return a flattened view as well
+  name?: string;
+  email?: string;
+  role?: string;
+  goals?: string;          // comma-separated backend format
+}
+
+export interface MessageResponseDTO {
+  message: string;
+}
+

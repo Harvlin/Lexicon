@@ -1,7 +1,6 @@
 package com.project.Lexicon.domain.entity;
 
-
-import com.project.Lexicon.domain.ProgressStatus;
+import com.project.Lexicon.domain.ChatRole;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
@@ -11,7 +10,8 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Progress {
+@Table(name = "chat_message")
+public class ChatMessage {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -24,9 +24,13 @@ public class Progress {
     private Lesson lesson;
 
     @Enumerated(EnumType.STRING)
-    private ProgressStatus status;
-    private Instant completedAt;
+    private ChatRole role;
 
-    // 0-100 overall lesson progress for this user (used by LessonDTO.progress)
-    private Integer progressPercent;
+    @Lob
+    private String content;
+
+    private Instant timestamp;
+
+    @Column(name = "thread_id")
+    private String threadId; // optional
 }

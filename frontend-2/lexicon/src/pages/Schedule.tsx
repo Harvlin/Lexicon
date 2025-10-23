@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSchedule } from '@/hooks/useSchedule';
 import { mockLessons } from '@/lib/mockData';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,16 @@ export default function SchedulePage() {
   const { weekId, sessions, stats, addSession, deleteSession, setStatus, regenerateCurrentWeek, shiftWeek, splitWeekSessions, splitDaySessions, source } = useSchedule();
 
   // Calendar + day focus
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    try {
+      const raw = localStorage.getItem('lexigrain:schedule:selectedDate');
+      if (raw) {
+        const d = new Date(raw);
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+    } catch {}
+    return new Date();
+  });
   const selectedISO = toISODate(selectedDate);
 
   // Add session modal
@@ -83,16 +92,29 @@ export default function SchedulePage() {
     setLessonId(''); setMinutes(60);
   };
 
-  // If selected day has no sessions but there are sessions in the week, focus earliest session date
+  // On initial load only: if starting on a day with no sessions, move to earliest session date once.
+  const didInitialAutoFocus = useRef(false);
   useEffect(() => {
+    if (didInitialAutoFocus.current) return;
     if (sessions.length > 0 && daySessions.length === 0) {
       const earliest = sessions.slice().sort((a,b) => a.date.localeCompare(b.date))[0];
       if (earliest) {
         const newDate = new Date(earliest.date);
-        if (!Number.isNaN(newDate.getTime())) setSelectedDate(newDate);
+        if (!Number.isNaN(newDate.getTime())) {
+          setSelectedDate(newDate);
+          didInitialAutoFocus.current = true;
+        }
       }
+    } else if (sessions.length > 0) {
+      // If current day already has sessions, mark as done
+      didInitialAutoFocus.current = true;
     }
   }, [sessions, daySessions.length]);
+
+  // Persist selected date
+  useEffect(() => {
+    try { localStorage.setItem('lexigrain:schedule:selectedDate', selectedDate.toISOString()); } catch {}
+  }, [selectedDate]);
 
   const completedCount = sessions.filter(s => s.status === 'done').length;
 
@@ -136,23 +158,53 @@ export default function SchedulePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1 bg-white/10 backdrop-blur-sm rounded-lg p-1">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-white/20" onClick={() => shiftWeek(-1)}>
-                    <ChevronLeft className="h-4 w-4"/>
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-white/20" onClick={() => shiftWeek(1)}>
-                    <ChevronRight className="h-4 w-4"/>
-                  </Button>
-                </div>
-                <Button variant="default" onClick={() => { savePreferences(); regenerateCurrentWeek(); }} className="gap-2 shadow-lg">
+                {/* Primary actions: Add first, then regenerate, split, settings */}
+                <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 shadow-lg order-1">
+                      <Plus className="h-4 w-4"/> Add Session
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-heading">New Study Session</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Select Lesson</label>
+                        <Select value={lessonId} onValueChange={v => setLessonId(v)}>
+                          <SelectTrigger className="h-11"><SelectValue placeholder="Choose a lesson" /></SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            {mockLessons.map(l => (
+                              <SelectItem value={l.id} key={l.id}>{l.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Planned Duration</label>
+                        <Input type="number" value={minutes} min={15} step={15} onChange={e => setMinutes(Number(e.target.value)||60)} className="h-11" />
+                        <p className="text-xs text-muted-foreground">In minutes (e.g., 60 = 1 hour)</p>
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <Button onClick={handleAdd} disabled={submitting || !lessonId} className="gap-2 bg-gradient-primary text-primary-foreground">
+                          {submitting && <Loader2 className="h-4 w-4 animate-spin"/>}
+                          Create Session
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Button variant="default" onClick={() => { savePreferences(); regenerateCurrentWeek(); }} className="gap-2 shadow-lg order-2">
                   <RefreshCcw className="h-4 w-4"/> Regenerate
                 </Button>
-                <Button variant="secondary" onClick={() => splitWeekSessions()} className="gap-2 shadow-lg">
+                <Button variant="secondary" onClick={() => splitWeekSessions()} className="gap-2 shadow-lg order-3">
                   <SplitSquareHorizontal className="h-4 w-4"/> Split
                 </Button>
                 <Dialog open={openPrefs} onOpenChange={setOpenPrefs}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="gap-2 shadow-lg">
+                    <Button variant="outline" className="gap-2 shadow-lg order-4">
                       <Settings className="h-4 w-4"/> Settings
                     </Button>
                   </DialogTrigger>
@@ -216,42 +268,6 @@ export default function SchedulePage() {
                     </div>
                   </DialogContent>
                 </Dialog>
-                <Dialog open={openAdd} onOpenChange={setOpenAdd}>
-                  <DialogTrigger asChild>
-                    <Button className="gap-2 shadow-lg">
-                      <Plus className="h-4 w-4"/> Add Session
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl font-heading">New Study Session</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Select Lesson</label>
-                        <Select value={lessonId} onValueChange={v => setLessonId(v)}>
-                          <SelectTrigger className="h-11"><SelectValue placeholder="Choose a lesson" /></SelectTrigger>
-                          <SelectContent className="max-h-72">
-                            {mockLessons.map(l => (
-                              <SelectItem value={l.id} key={l.id}>{l.title}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Planned Duration</label>
-                        <Input type="number" value={minutes} min={15} step={15} onChange={e => setMinutes(Number(e.target.value)||60)} className="h-11" />
-                        <p className="text-xs text-muted-foreground">In minutes (e.g., 60 = 1 hour)</p>
-                      </div>
-                      <div className="flex justify-end pt-2">
-                        <Button onClick={handleAdd} disabled={submitting || !lessonId} className="gap-2 bg-gradient-primary text-primary-foreground">
-                          {submitting && <Loader2 className="h-4 w-4 animate-spin"/>}
-                          Create Session
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
               </div>
             </div>
           </div>
@@ -301,24 +317,13 @@ export default function SchedulePage() {
                 onSelect={(d) => d && setSelectedDate(d)}
                 modifiers={{
                   hasSessions: (date) => hasSessionsDates.has(toISODate(date)),
-                  completed: (date) => completedDates.has(toISODate(date)),
                 }}
                 modifiersClassNames={{
-                  hasSessions: 'ring-2 ring-ring/50 ring-offset-2 rounded-lg font-semibold',
-                  completed: 'bg-success/20 text-success font-bold',
+                  // Subtle dot marker below the date for days with sessions
+                  hasSessions: "relative after:content-[''] after:block after:h-1 after:w-1 after:rounded-full after:bg-primary after:mx-auto after:mt-1",
                 }}
                 className="rounded-lg"
               />
-              <div className="flex items-center gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
-                <div className="flex items-center gap-2">
-                  <span className="inline-block h-4 w-4 ring-2 ring-ring/50 rounded"></span>
-                  <span>Planned</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-block h-4 w-4 bg-success/20 rounded"></span>
-                  <span>Completed</span>
-                </div>
-              </div>
             </CardContent>
           </Card>
 

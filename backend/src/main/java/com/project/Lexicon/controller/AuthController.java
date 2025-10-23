@@ -69,14 +69,20 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<AuthResponse> getCurrentUser() {
+    public ResponseEntity<?> getCurrentUser(org.springframework.security.core.Authentication authentication) {
         try {
+            if (authentication == null || !authentication.isAuthenticated() ||
+                    (authentication.getPrincipal() instanceof String &&
+                            "anonymousUser".equals(authentication.getPrincipal()))) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("Unauthorized"));
+            }
             AuthResponse response = authService.getCurrentUser();
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Error getting current user: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to fetch current user"));
         }
     }
 

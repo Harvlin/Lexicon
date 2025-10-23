@@ -22,14 +22,6 @@ type DifficultyFilter = "all" | "beginner" | "intermediate" | "advanced";
 
 export default function Library() {
   // Lessons: show mock immediately, then auto-upgrade to API when ready
-  const query = useMemo(() => ({
-    search: (undefined as string | undefined), // filled below by state
-    category: (undefined as string | undefined),
-    difficulty: (undefined as string | undefined),
-    sort: (undefined as string | undefined),
-    page: 1,
-    limit: 30,
-  }), []);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState<SortOption>("recommended");

@@ -172,7 +172,8 @@ export default function Onboarding() {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
     }
     setSaving(false);
-    navigate("/");
+    // After onboarding, require the user to log in
+    navigate("/auth/signin", { replace: true, state: { fromOnboarding: true } });
   };
 
   // Completion guards for stepper navigation
@@ -217,7 +218,7 @@ export default function Onboarding() {
             )}
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => freshOnboarding ? navigate('/auth/signin', { replace: true, state: { fromOnboarding: true, skipped: true } }) : navigate('/')}
               className="text-xs font-medium text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
             >Skip</button>
           </div>

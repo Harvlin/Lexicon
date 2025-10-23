@@ -8,20 +8,26 @@ import { LessonCard } from "@/components/dashboard/LessonCard";
 import { ProgressRing } from "@/components/dashboard/ProgressRing";
 import { mockLessons, mockProgress, mockUser } from "@/lib/mockData";
 import { endpoints } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type { LessonDTO, UserDTO, UserProgressSummaryDTO } from "@/lib/types";
 import heroBanner from "@/assets/hero-banner.jpg";
 
 export default function Dashboard() {
+  const { user: authUser } = useAuth();
   const [lessons, setLessons] = useState<LessonDTO[]>(mockLessons);
-  const [user, setUser] = useState<UserDTO | null>(null);
+  const [user, setUser] = useState<UserDTO | null>(authUser);
   const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
 
   useEffect(() => {
-    // Fetch user and progress, with graceful fallback to mocks
-    endpoints.me
-      .get()
-      .then(setUser)
-      .catch(() => setUser({ name: mockUser.name, email: mockUser.email, avatar: mockUser.avatar }));
+    // Prefer auth context user for greeting; fallback to server/me then mock
+    if (authUser) {
+      setUser(authUser);
+    } else {
+      endpoints.me
+        .get()
+        .then(setUser)
+        .catch(() => setUser({ name: mockUser.name, email: mockUser.email, avatar: mockUser.avatar }));
+    }
 
     endpoints.progress
       .summary()
@@ -32,7 +38,7 @@ export default function Dashboard() {
       .list({ limit: 20, sort: "recent" })
       .then((res) => setLessons(res.items))
       .catch(() => setLessons(mockLessons));
-  }, []);
+  }, [authUser]);
 
   const handleToggleFavorite = (id: string) => {
     // Optimistic toggle

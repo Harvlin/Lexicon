@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Mail, Lock, Eye, EyeOff, Chrome, User } from "lucide-react";
+import { endpoints } from "@/lib/api";
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -15,28 +16,28 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
     if (!agreedToTerms) {
       toast.error("Please agree to the Terms of Service");
       return;
     }
-
     setLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
+    const form = e.currentTarget;
+    const name = (form.elements.namedItem("name") as HTMLInputElement)?.value;
+    const email = (form.elements.namedItem("email") as HTMLInputElement)?.value;
+    const password = (form.elements.namedItem("password") as HTMLInputElement)?.value;
+    try {
+      await endpoints.auth.register({ name, email, password, role: 'USER', goals: [] as string[] });
+      toast.success("Account created!", { description: "Let's personalize your journey, then sign in." });
+      try { localStorage.removeItem("lexigrain:onboarding"); } catch {}
+      // Redirect to Onboarding first; that page will send the user to Sign In when done
+      navigate("/onboarding", { replace: true, state: { freshOnboarding: true, fromRegister: true } });
+    } catch (err: any) {
+      toast.error(err?.message || "Registration failed");
+    } finally {
       setLoading(false);
-      toast.success("Account created successfully! 🎉", {
-        description: "Let's personalize your journey",
-      });
-      try {
-        // Clear any stale onboarding completion so user always sees flow after new signup
-  localStorage.removeItem("lexigrain:onboarding");
-      } catch { /* ignore */ }
-      navigate("/onboarding", { state: { freshOnboarding: true } });
-    }, 1000);
+    }
   };
 
   const handleGoogleSignUp = () => {
@@ -69,6 +70,7 @@ export default function SignUp() {
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="name"
+                    name="name"
                     type="text"
                     placeholder="John Doe"
                     className="pl-10"
@@ -83,6 +85,7 @@ export default function SignUp() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     placeholder="you@example.com"
                     className="pl-10"
@@ -97,6 +100,7 @@ export default function SignUp() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Create a strong password"
                     className="pl-10 pr-10"

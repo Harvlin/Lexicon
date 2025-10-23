@@ -39,6 +39,12 @@ public class User {
     @CollectionTable(name = "user_goals", joinColumns = @JoinColumn(name = "user_id"))
     private List<String> goals;
 
+    // Optional avatar for profile (frontend expects this as 'avatar')
+    private String avatarUrl;
+
+    // When the user joined (maps to joinedDate on the frontend)
+    private LocalDateTime joinedAt;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;

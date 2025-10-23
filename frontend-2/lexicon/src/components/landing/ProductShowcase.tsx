@@ -168,7 +168,7 @@ function CollageCard({ title, desc, img, y, className, z = 10, float, floatDelay
 									<img
 										src={img}
 										alt={title}
-										className="w-full h-full object-contain rounded-[inherit] select-none pointer-events-none"
+										className="w-full h-full object-cover rounded-[inherit] select-none pointer-events-none"
 									/>
 								</div>
 

@@ -63,15 +63,30 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        // Specify exact origins instead of wildcard
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000"
-        ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
+    CorsConfiguration configuration = new CorsConfiguration();
+    // Allow local dev frontends (Vite/React) and add more as needed
+    configuration.setAllowedOrigins(Arrays.asList(
+        // Local dev
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        // LAN dev (accessing Vite via local network)
+        "http://10.189.253.238:5173",
+        "http://10.189.253.238:4173",
+        // Vercel production/custom domains
+        "https://lexigrain.vercel.app",
+        "https://lexigrain-4l9dtj20z-harvlins-projects.vercel.app"
+    ));
+    // Also allow other Vercel preview deployments via pattern matching
+    configuration.setAllowedOriginPatterns(Arrays.asList("https://*.vercel.app"));
+    configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+    configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
+    configuration.setExposedHeaders(Arrays.asList("Authorization"));
+    configuration.setAllowCredentials(true);
+    configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

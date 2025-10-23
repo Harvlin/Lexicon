@@ -31,6 +31,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
+        // Skip JWT parsing only for public auth endpoints (login/register);
+        // other auth endpoints like /api/auth/me or /api/auth/change-password require authentication
+        String uri = request.getRequestURI();
+        String method = request.getMethod();
+        if (uri != null) {
+            boolean isLogin = "/api/auth/login".equals(uri) && "POST".equalsIgnoreCase(method);
+            boolean isRegister = "/api/auth/register".equals(uri) && "POST".equalsIgnoreCase(method);
+            if (isLogin || isRegister) {
+                chain.doFilter(request, response);
+                return;
+            }
+        }
+
         String header = request.getHeader("Authorization");
         String token = null;
         String email = null;
@@ -40,7 +53,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 email = jwtUtil.getEmailFromToken(token);
             } catch (Exception e) {
-                logger.error("JWT token parsing error: " + e.getMessage());
+                // Reduce log level to debug to prevent error spam on expired/invalid tokens
+                logger.debug("JWT token parsing issue: " + e.getMessage());
             }
         }
 

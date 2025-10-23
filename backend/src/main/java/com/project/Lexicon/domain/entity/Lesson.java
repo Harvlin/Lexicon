@@ -23,18 +23,26 @@ public class Lesson {
     private Long id;
 
     private String title;
+    @Column(columnDefinition = "TEXT")
+    private String description;
     @Enumerated(EnumType.STRING)
     private Type type;
 
     @Enumerated(EnumType.STRING)
     private Level level;
+    private String category;
+    // Legacy content URL (keep for compatibility)
     private String contentUrl;
+    // Video lessons URL exposed to frontend as LessonDTO.videoUrl
+    private String videoUrl;
     private Integer duration;
+    private String thumbnail;
 
     @ElementCollection
-    @CollectionTable(name = "lesson_topics", joinColumns = @JoinColumn(name = "lesson_id"))
-    @Column(name = "topic")
-    private List<String> topics;
+    @CollectionTable(name = "lesson_tags", joinColumns = @JoinColumn(name = "lesson_id"))
+    @Column(name = "tag")
+    private List<String> tags;
 
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

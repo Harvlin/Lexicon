@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { endpoints, fetchWithFallback } from "@/lib/api";
+import { useParams } from "react-router-dom";
 
 interface Message {
   id: string;
@@ -21,6 +23,7 @@ const mockResponses = [
 ];
 
 export function ChatBot() {
+  const { id: lessonId } = useParams();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -51,17 +54,25 @@ export function ChatBot() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    // Call backend with fallback to a mock response
+    (async () => {
+      const history = messages.slice(-8).map(m => ({ role: m.role, content: m.content }));
+      const { data, source } = await fetchWithFallback(
+        () => endpoints.chat.ask({ prompt: userMessage.content, lessonId, history }),
+        () => ({ id: `${Date.now() + 1}`, role: 'assistant' as const, content: mockResponses[Math.floor(Math.random() * mockResponses.length)], timestamp: new Date().toISOString() })
+      );
       const response: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: mockResponses[Math.floor(Math.random() * mockResponses.length)],
-        timestamp: new Date(),
+        id: data.id,
+        role: data.role,
+        content: data.content,
+        timestamp: new Date(data.timestamp || new Date()),
       };
-      setMessages((prev) => [...prev, response]);
-      setIsTyping(false);
-    }, 1500);
+      // Ensure a small delay to keep UX consistent when API is instant
+      setTimeout(() => {
+        setMessages((prev) => [...prev, response]);
+        setIsTyping(false);
+      }, source === 'api' ? 300 : 800);
+    })();
   };
 
   return (

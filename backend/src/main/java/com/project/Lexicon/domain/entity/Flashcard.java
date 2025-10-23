@@ -20,7 +20,8 @@ public class Flashcard {
     @JoinColumn(name = "lesson_id")
     private Lesson lesson;
 
-    private String term;
-    private String definition;
-    private String example;
+    // Front/back sides for the card content expected by the frontend
+    private String front;
+    private String back;
+    private String example; // optional
 }

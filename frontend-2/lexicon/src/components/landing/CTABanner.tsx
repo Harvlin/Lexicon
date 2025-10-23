@@ -19,13 +19,13 @@ export function CTABannerSection(){
           <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto leading-relaxed">Your AI co‑pilot for mastering complex topics. Join thousands compounding knowledge daily.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Button size="lg" className="text-lg px-8 py-6 bg-white text-primary hover:bg-white/90 shadow-elevated group">
-              Get Started Free <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              Get Started<ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button size="lg" variant="outline" className="text-lg px-8 py-6 bg-white/10 backdrop-blur-sm text-white border-2 border-white/30 hover:bg-white/20">
               See How It Works
             </Button>
           </div>
-          <p className="text-white/70 text-sm">No credit card required • 14‑day free trial • Cancel anytime</p>
+          <p className="text-white/70 text-sm">100% free • No credit card required • Start learning instantly</p>
         </motion.div>
       </div>
     </section>

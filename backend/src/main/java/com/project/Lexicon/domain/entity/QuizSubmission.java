@@ -1,7 +1,5 @@
 package com.project.Lexicon.domain.entity;
 
-
-import com.project.Lexicon.domain.ProgressStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
@@ -11,22 +9,24 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Progress {
+@Table(name = "quiz_submission")
+public class QuizSubmission {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lesson_id")
+    @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
 
-    @Enumerated(EnumType.STRING)
-    private ProgressStatus status;
-    private Instant completedAt;
+    private Integer total;
+    private Integer correct;
+    private Integer score; // 0-100
+    private Boolean passed;
+    private Integer pointsAwarded; // optional
 
-    // 0-100 overall lesson progress for this user (used by LessonDTO.progress)
-    private Integer progressPercent;
+    private Instant createdAt;
 }

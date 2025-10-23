@@ -63,10 +63,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               return (
                 <Link key={item.path} to={item.path} onClick={onClose}>
                   <Button
-                    variant={active ? "secondary" : "ghost"}
+                    variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-3 transition-all",
-                      active && "bg-primary/10 text-primary font-medium"
+                      "w-full justify-start gap-3 transition-colors",
+                      active ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted"
                     )}
                   >
                     <Icon className="h-5 w-5" />
@@ -76,22 +76,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               );
             })}
           </nav>
-
-          <div className="mt-auto p-4 rounded-lg bg-gradient-primary text-primary-foreground">
-            <h3 className="font-heading font-semibold mb-1">
-              Unlock Premium
-            </h3>
-            <p className="text-sm opacity-90 mb-3">
-              Get unlimited access to all courses
-            </p>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full bg-white/20 hover:bg-white/30 text-white border-white/20"
-            >
-              Upgrade Now
-            </Button>
-          </div>
+          {/* Removed promo section per request */}
         </div>
       </aside>
     </>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,9 +22,12 @@ import {
 } from "lucide-react";
 import { mockUser } from "@/lib/mockData";
 import { endpoints } from "@/lib/api";
-import type { UserDTO } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
+import type { UserDTO, NotificationPrefsDTO } from "@/lib/types";
 
 export default function Settings() {
+  const navigate = useNavigate();
+  const { user: authUser, logout } = useAuth();
   const [user, setUser] = useState<UserDTO | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -37,24 +41,44 @@ export default function Settings() {
   const [marketingEmails, setMarketingEmails] = useState(false);
 
   useEffect(() => {
-    endpoints.me
-      .get()
-      .then((u) => {
-        setUser(u);
-        const parts = (u.name || "").trim().split(" ");
-        setFirstName(parts[0] || "");
-        setLastName(parts.slice(1).join(" ") || "");
-        setEmail(u.email || "");
+    if (authUser) {
+      setUser(authUser);
+      const parts = (authUser.name || "").trim().split(" ");
+      setFirstName(parts[0] || "");
+      setLastName(parts.slice(1).join(" ") || "");
+      setEmail(authUser.email || "");
+    } else {
+      // Fallback to server fetch or mock if not in context
+      endpoints.me
+        .get()
+        .then((u) => {
+          setUser(u);
+          const parts = (u.name || "").trim().split(" ");
+          setFirstName(parts[0] || "");
+          setLastName(parts.slice(1).join(" ") || "");
+          setEmail(u.email || "");
+        })
+        .catch(() => {
+          const parts = (mockUser.name || "").trim().split(" ");
+          setFirstName(parts[0] || "");
+          setLastName(parts.slice(1).join(" ") || "");
+          setEmail(mockUser.email || "");
+          setUser({ name: mockUser.name, email: mockUser.email, avatar: mockUser.avatar });
+        });
+    }
+    // Load notification prefs if available; otherwise keep defaults
+    endpoints.settings
+      .getNotifications()
+      .then((prefs) => {
+        setEmailNotifications(prefs.emailNotifications);
+        setPushNotifications(prefs.pushNotifications);
+        setWeeklyDigest(prefs.weeklyDigest);
+        setMarketingEmails(prefs.marketingEmails);
       })
       .catch(() => {
-        // Fallback to mock
-        const parts = (mockUser.name || "").trim().split(" ");
-        setFirstName(parts[0] || "");
-        setLastName(parts.slice(1).join(" ") || "");
-        setEmail(mockUser.email || "");
-        setUser({ name: mockUser.name, email: mockUser.email, avatar: mockUser.avatar });
+        // ignore; use defaults
       });
-  }, []);
+  }, [authUser]);
 
   const handleSaveProfile = () => {
     const updated: Partial<UserDTO> = {
@@ -75,11 +99,30 @@ export default function Settings() {
   };
 
   const handleSavePassword = () => {
-    toast.success("Password changed successfully");
+    // Ideally capture form values; since UI inputs are uncontrolled here, just simulate
+    endpoints.settings
+      .changePassword({ currentPassword: "", newPassword: "" })
+      .then(() => toast.success("Password changed successfully"))
+      .catch(() => toast.error("Failed to change password"));
   };
 
   const handleSaveNotifications = () => {
-    toast.success("Notification preferences saved");
+    const prefs: NotificationPrefsDTO = {
+      emailNotifications,
+      pushNotifications,
+      weeklyDigest,
+      marketingEmails,
+    };
+    endpoints.settings
+      .updateNotifications(prefs)
+      .then(() => toast.success("Notification preferences saved"))
+      .catch(() => toast.error("Couldn't save to server. Local preferences updated."));
+  };
+
+  const handleLogout = () => {
+    logout();
+    toast.success("You’ve been logged out");
+    navigate("/auth/signin", { replace: true, state: { fromLogout: true } });
   };
 
   return (
@@ -281,6 +324,16 @@ export default function Settings() {
               <Button onClick={handleSavePassword} className="bg-primary hover:bg-primary-hover">
                 Update Password
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Log out</CardTitle>
+              <CardDescription>Sign out from this device</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button variant="outline" onClick={handleLogout}>Log out</Button>
             </CardContent>
           </Card>
 

@@ -3,6 +3,7 @@ package com.project.Lexicon.service.impl;
 import com.project.Lexicon.domain.dto.security.AuthResponse;
 import com.project.Lexicon.domain.dto.security.LoginDto;
 import com.project.Lexicon.domain.dto.security.RegisterDto;
+import com.project.Lexicon.domain.Role;
 import com.project.Lexicon.domain.entity.User;
 import com.project.Lexicon.repository.UserRepository;
 import com.project.Lexicon.security.JwtUtil;
@@ -44,11 +45,11 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // Create new user
-        User user = User.builder()
+    User user = User.builder()
                 .name(dto.getName())
                 .email(dto.getEmail().toLowerCase())
                 .password(passwordEncoder.encode(dto.getPassword()))
-                .role(dto.getRole())
+        .role(dto.getRole() != null ? dto.getRole() : Role.USER)
                 .goals(dto.getGoals() != null ? dto.getGoals() : new ArrayList<>())
                 .isActive(true)
                 .build();

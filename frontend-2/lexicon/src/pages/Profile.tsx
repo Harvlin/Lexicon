@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calendar, Target, Mail, MapPin, Edit, Settings as SettingsIcon, BookOpen, TrendingUp, Trophy, Bell, Monitor, BarChart3 } from "lucide-react";
+import { Calendar, Target, Mail, Edit, Settings as SettingsIcon, BookOpen, TrendingUp, Trophy, Bell, Monitor, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -7,22 +7,29 @@ import { Button } from "@/components/ui/button";
 import { mockUser, mockProgress } from "@/lib/mockData";
 import { Link } from "react-router-dom";
 import { endpoints } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type { UserDTO, UserProgressSummaryDTO } from "@/lib/types";
 
 export default function Profile() {
-  const [user, setUser] = useState<UserDTO | null>(null);
+  const { user: authUser } = useAuth();
+  const [user, setUser] = useState<UserDTO | null>(authUser);
   const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
 
   useEffect(() => {
-    endpoints.me
-      .get()
-      .then(setUser)
-      .catch(() => setUser({ name: mockUser.name, email: mockUser.email, avatar: mockUser.avatar, joinedDate: mockUser.joinedDate }));
+    // Prefer global auth user; fallback to server /me then mock
+    if (authUser) {
+      setUser(authUser);
+    } else {
+      endpoints.me
+        .get()
+        .then(setUser)
+        .catch(() => setUser({ name: mockUser.name, email: mockUser.email, avatar: mockUser.avatar, joinedDate: mockUser.joinedDate }));
+    }
     endpoints.progress
       .summary()
       .then(setProgress)
       .catch(() => setProgress(mockProgress));
-  }, []);
+  }, [authUser]);
 
   return (
     <div className="space-y-8 pb-8 max-w-4xl mx-auto">
@@ -78,11 +85,7 @@ export default function Profile() {
                     <Mail className="h-4 w-4" />
                     <span>{user?.email || mockUser.email}</span>
                   </div>
-                  <div className="hidden md:block">•</div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    <span>San Francisco, CA</span>
-                  </div>
+                  {/* Location removed per request */}
                 </div>
               </div>
               

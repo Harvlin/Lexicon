@@ -8,23 +8,35 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Mail, Lock, Eye, EyeOff, Chrome } from "lucide-react";
+import { endpoints, setAuthToken } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 export default function SignIn() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const { refresh } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    const form = e.currentTarget;
+    const email = (form.elements.namedItem("email") as HTMLInputElement)?.value;
+    const password = (form.elements.namedItem("password") as HTMLInputElement)?.value;
+    try {
+      const res = await endpoints.auth.login({ email, password });
+  const token = res.token || (res as any).accessToken;
+      if (token) setAuthToken(token);
+  // Immediately hydrate global user from backend
+  await refresh();
       toast.success("Welcome back!");
       navigate("/");
-    }, 1000);
+    } catch (err: any) {
+      toast.error(err?.message || "Invalid email or password");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleSignIn = () => {
@@ -57,6 +69,7 @@ export default function SignIn() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     placeholder="you@example.com"
                     className="pl-10"
@@ -76,6 +89,7 @@ export default function SignIn() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     className="pl-10 pr-10"
