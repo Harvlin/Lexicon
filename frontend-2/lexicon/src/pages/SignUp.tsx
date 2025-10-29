@@ -29,9 +29,10 @@ export default function SignUp() {
     const password = (form.elements.namedItem("password") as HTMLInputElement)?.value;
     try {
       await endpoints.auth.register({ name, email, password, role: 'USER', goals: [] as string[] });
-      toast.success("Account created!", { description: "Let's personalize your journey, then sign in." });
+      // Keep desired flow: Sign up -> Onboarding -> Sign in (no auto-login here)
+      toast.success("Account created!", { description: "Let's personalize your journey." });
       try { localStorage.removeItem("lexigrain:onboarding"); } catch {}
-      // Redirect to Onboarding first; that page will send the user to Sign In when done
+      // Go to onboarding. Saving will be stored locally now and synced after sign-in.
       navigate("/onboarding", { replace: true, state: { freshOnboarding: true, fromRegister: true } });
     } catch (err: any) {
       toast.error(err?.message || "Registration failed");

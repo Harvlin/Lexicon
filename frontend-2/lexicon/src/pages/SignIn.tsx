@@ -30,6 +30,53 @@ export default function SignIn() {
       if (token) setAuthToken(token);
   // Immediately hydrate global user from backend
   await refresh();
+      // If user had onboarding saved locally (from pre-auth onboarding), sync it now
+      try {
+        const raw = localStorage.getItem("lexigrain:onboarding");
+        if (raw) {
+          const local = JSON.parse(raw);
+          // Sanitize to server DTO shape and ensure required fields
+          const payload = {
+            goals: Array.isArray(local.goals) ? local.goals : [],
+            skills: Array.isArray(local.skills) ? local.skills : [],
+            dailyHours: typeof local.dailyHours === 'number' ? local.dailyHours : 1,
+            schedulePreset: local.schedulePreset || local.preferredTime || 'Evening',
+            daysOfWeek: Array.isArray(local.daysOfWeek) ? local.daysOfWeek : [],
+            specificTime: typeof local.specificTime === 'string' ? local.specificTime : undefined,
+            reminderEnabled: !!local.reminderEnabled,
+            completedAt: typeof local.completedAt === 'string' ? local.completedAt : new Date().toISOString(),
+          };
+          try {
+            await endpoints.onboarding.save(payload);
+            // Verify persisted by reading back; retry once if empty
+            const server = await endpoints.onboarding.get().catch(() => null);
+            const empty = !server || (
+              (!server.goals || server.goals.length === 0) &&
+              (!server.skills || server.skills.length === 0) &&
+              (!server.dailyHours || Number(server.dailyHours) <= 0)
+            );
+            if (empty) {
+              // retry with minimal payload
+              await endpoints.onboarding.save({
+                goals: payload.goals,
+                skills: payload.skills,
+                dailyHours: payload.dailyHours,
+                schedulePreset: payload.schedulePreset,
+                daysOfWeek: payload.daysOfWeek,
+                specificTime: payload.specificTime,
+                reminderEnabled: payload.reminderEnabled,
+                completedAt: payload.completedAt,
+              });
+            }
+            // Keep local copy to support components that read onboarding from localStorage
+            localStorage.setItem("lexigrain:onboarding", JSON.stringify(payload));
+            toast.success("Onboarding synced to your account");
+          } catch (err) {
+            // keep local copy; surface a gentle hint
+            toast.message("We’ll sync your onboarding once you’re online.");
+          }
+        }
+      } catch {}
       toast.success("Welcome back!");
       navigate("/");
     } catch (err: any) {

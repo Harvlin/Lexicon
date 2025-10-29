@@ -46,12 +46,14 @@ const TIME_OPTIONS = ["Morning", "Afternoon", "Evening", "Late Night"];
 const DAY_OPTIONS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const STORAGE_KEY = "lexigrain:onboarding";
-import { endpoints } from "@/lib/api";
+import { endpoints, fetchWithFallback } from "@/lib/api";
 import type { OnboardingDTO } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   // if we navigated from a fresh signup we should not auto-redirect
   const freshOnboarding = (location.state as any)?.freshOnboarding === true;
   const [step, setStep] = useState(0);
@@ -75,34 +77,57 @@ export default function Onboarding() {
   const restart = /[?&]restart=1/.test(search);
   const [existingData, setExistingData] = useState<any>(null);
 
+  // Helper: read local draft (and migrate legacy key) as fallback
+  const readLocalDraft = (): OnboardingDTO | null => {
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const legacy = localStorage.getItem('lexicon:onboarding');
+      if (legacy) {
+        try { localStorage.setItem(STORAGE_KEY, legacy); } catch {}
+        raw = legacy;
+      }
+    }
+    if (!raw) return null;
+    try { return JSON.parse(raw) as OnboardingDTO; } catch { return null; }
+  };
+
+  // Normalize incoming DTO into local component state
+  const hydrateFrom = (dto: OnboardingDTO) => {
+    setState(prev => ({
+      ...prev,
+      goals: Array.isArray(dto.goals) ? dto.goals : [],
+      customGoal: "",
+      skills: Array.isArray(dto.skills) ? dto.skills : [],
+      customSkill: "",
+      dailyHours: typeof dto.dailyHours === 'number' && !isNaN(dto.dailyHours) ? dto.dailyHours : prev.dailyHours,
+      preferredTime: dto.schedulePreset && dto.schedulePreset !== 'Custom' ? dto.schedulePreset : prev.preferredTime,
+      schedulePreset: dto.schedulePreset || prev.schedulePreset,
+      daysOfWeek: Array.isArray(dto.daysOfWeek) ? dto.daysOfWeek : [],
+      specificTime: dto.specificTime || prev.specificTime,
+      reminderEnabled: !!dto.reminderEnabled,
+    }));
+  };
+
   useEffect(() => {
-    // Prefer backend onboarding if available, fallback to local storage; migrate legacy
+    // Prefer backend onboarding with a timeout; fallback to local storage draft safely
     (async () => {
-      try {
-        const server = await endpoints.onboarding.get();
-        setExistingData(server);
-        if (server?.completedAt && !force && !restart && !freshOnboarding) {
+      const { data, source } = await fetchWithFallback<OnboardingDTO | null>(
+        async () => {
+          const server = await endpoints.onboarding.get();
+          return server ?? null;
+        },
+        () => readLocalDraft()
+      );
+
+      if (data) {
+        setExistingData(data);
+        hydrateFrom(data);
+        if (data.completedAt && !force && !restart && !freshOnboarding) {
           navigate("/");
-        }
-      } catch {
-        let raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-          const legacy = localStorage.getItem('lexicon:onboarding');
-          if (legacy) {
-            try { localStorage.setItem(STORAGE_KEY, legacy); } catch {}
-            raw = legacy;
-          }
-        }
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            setExistingData(parsed);
-            if (parsed?.completedAt && !force && !restart && !freshOnboarding) {
-              navigate("/");
-            }
-          } catch {}
+          return;
         }
       }
+
       if (restart) {
         localStorage.removeItem(STORAGE_KEY);
         try { await endpoints.onboarding.save({} as OnboardingDTO); } catch {}
@@ -167,12 +192,18 @@ export default function Onboarding() {
     };
     try {
       await endpoints.onboarding.save(payload as OnboardingDTO);
+      // Keep a local copy to support components relying on local preferences
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
     } catch {
       // fallback to local storage
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
+      toast({
+        title: "Saved locally",
+        description: "We’ll sync your onboarding once you’re online.",
+      });
     }
     setSaving(false);
-    // After onboarding, require the user to log in
+    // Desired flow: go to Sign In after onboarding
     navigate("/auth/signin", { replace: true, state: { fromOnboarding: true } });
   };
 

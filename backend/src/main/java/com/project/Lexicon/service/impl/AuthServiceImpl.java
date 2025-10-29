@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.naming.AuthenticationException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 
 @Service
@@ -52,6 +53,9 @@ public class AuthServiceImpl implements AuthService {
         .role(dto.getRole() != null ? dto.getRole() : Role.USER)
                 .goals(dto.getGoals() != null ? dto.getGoals() : new ArrayList<>())
                 .isActive(true)
+            .createdAt(LocalDateTime.now())
+            .joinedAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
                 .build();
 
         userRepository.save(user);

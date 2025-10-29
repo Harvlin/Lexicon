@@ -15,9 +15,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailAndIsActiveTrue(String email);
     boolean existsByEmail(String email);
     List<User> findByRole(Role role);
-
+    Optional<User> findByName(String username);
     @Query("SELECT u FROM User u WHERE u.isActive = true")
     List<User> findAllActiveUsers();
 
     long countByRole(Role role);
+
+    User getUserByName(String name);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Calendar, Target, Mail, Edit, Settings as SettingsIcon, BookOpen, TrendingUp, Trophy, Bell, Monitor, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -6,14 +6,34 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { mockUser, mockProgress } from "@/lib/mockData";
 import { Link } from "react-router-dom";
-import { endpoints } from "@/lib/api";
+import { endpoints, fetchWithFallback } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { UserDTO, UserProgressSummaryDTO } from "@/lib/types";
+import type { UserDTO, UserProgressSummaryDTO, OnboardingDTO } from "@/lib/types";
 
 export default function Profile() {
   const { user: authUser } = useAuth();
   const [user, setUser] = useState<UserDTO | null>(authUser);
   const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingDTO | null>(null);
+
+  // share the same storage key as Onboarding page for robust offline fallback
+  const STORAGE_KEY = "lexigrain:onboarding";
+  const readLocalOnboardingDraft = (): OnboardingDTO | null => {
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch { raw = null; }
+    if (!raw) {
+      // migrate legacy key if present
+      try {
+        const legacy = localStorage.getItem("lexicon:onboarding");
+        if (legacy) {
+          try { localStorage.setItem(STORAGE_KEY, legacy); } catch {}
+          raw = legacy;
+        }
+      } catch {}
+    }
+    if (!raw) return null;
+    try { return JSON.parse(raw) as OnboardingDTO; } catch { return null; }
+  };
 
   useEffect(() => {
     // Prefer global auth user; fallback to server /me then mock
@@ -29,7 +49,65 @@ export default function Profile() {
       .summary()
       .then(setProgress)
       .catch(() => setProgress(mockProgress));
+
+    // Hydrate onboarding details with graceful fallback (API -> local draft -> null)
+    (async () => {
+      const { data } = await fetchWithFallback<OnboardingDTO | null>(
+        async () => {
+          try { return await endpoints.onboarding.get(); } catch { return null; }
+        },
+        () => readLocalOnboardingDraft()
+      );
+      setOnboarding(data ?? null);
+    })();
   }, [authUser]);
+
+  // Derived display strings for Learning Preferences
+  const focusAreasText = useMemo(() => {
+    // Prefer skills for "Focus Areas"; fallback to goals to avoid empty UI
+    if (onboarding?.skills && onboarding.skills.length) return onboarding.skills.join(", ");
+    if (onboarding?.goals && onboarding.goals.length) return onboarding.goals.join(", ");
+    return "Web Development, UI/UX Design"; // fallback
+  }, [onboarding]);
+
+  const dailyGoalText = useMemo(() => {
+    const h = onboarding?.dailyHours;
+    if (typeof h === "number" && !isNaN(h) && h > 0) {
+      const label = h === 1 ? "hour" : "hours";
+      return `${h} ${label} per day`;
+    }
+    return "2 hours per day"; // fallback to a friendly default
+  }, [onboarding]);
+
+  const remindersText = useMemo(() => {
+    if (!onboarding) return "Daily at 9:00 AM"; // safe default
+    if (!onboarding.reminderEnabled) return "Off";
+
+    const fmtTime = (t?: string) => {
+      if (!t) return null;
+      const [hh, mm] = t.split(":").map((x) => parseInt(x, 10));
+      if (isNaN(hh) || isNaN(mm)) return null;
+      const d = new Date();
+      d.setHours(hh, mm, 0, 0);
+      return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    };
+
+    if (onboarding.schedulePreset && onboarding.schedulePreset !== "Custom") {
+      // e.g., Morning/Afternoon/Evening
+      return `Daily • ${onboarding.schedulePreset}`;
+    }
+
+    const days = Array.isArray(onboarding.daysOfWeek) && onboarding.daysOfWeek.length
+      ? onboarding.daysOfWeek.join(", ")
+      : "Daily";
+    const time = fmtTime(onboarding.specificTime);
+    return time ? `${days} at ${time}` : days;
+  }, [onboarding]);
+
+  const goalsText = useMemo(() => {
+    if (onboarding?.goals && onboarding.goals.length) return onboarding.goals.join(", ");
+    return "Set your learning goals";
+  }, [onboarding]);
 
   return (
     <div className="space-y-8 pb-8 max-w-4xl mx-auto">
@@ -174,7 +252,7 @@ export default function Profile() {
               </div>
               <div>
                 <p className="font-semibold mb-1">Focus Areas</p>
-                <p className="text-sm text-muted-foreground">Web Development, UI/UX Design</p>
+                <p className="text-sm text-muted-foreground">{focusAreasText}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -183,16 +261,16 @@ export default function Profile() {
               </div>
               <div>
                 <p className="font-semibold mb-1">Daily Goal</p>
-                <p className="text-sm text-muted-foreground">2 hours per day</p>
+                <p className="text-sm text-muted-foreground">{dailyGoalText}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                <Monitor className="h-5 w-5 text-accent" />
+                <Target className="h-5 w-5 text-accent" />
               </div>
               <div>
-                <p className="font-semibold mb-1">Preferred Device</p>
-                <p className="text-sm text-muted-foreground">Desktop & Mobile</p>
+                <p className="font-semibold mb-1">Goals</p>
+                <p className="text-sm text-muted-foreground">{goalsText}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -201,7 +279,7 @@ export default function Profile() {
               </div>
               <div>
                 <p className="font-semibold mb-1">Reminders</p>
-                <p className="text-sm text-muted-foreground">Daily at 9:00 AM</p>
+                <p className="text-sm text-muted-foreground">{remindersText}</p>
               </div>
             </div>
           </div>
