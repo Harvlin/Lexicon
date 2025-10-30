@@ -1,58 +1,61 @@
 package com.project.Lexicon.service.impl;
 
 import com.project.Lexicon.service.TranscriptionService;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.vosk.Model;
-import org.vosk.Recognizer;
+import org.springframework.web.socket.*;
+import org.springframework.web.socket.client.standard.StandardWebSocketClient;
+import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
 
 @Service
-@Slf4j
 public class TranscriptionServiceImpl implements TranscriptionService {
 
-    public String transcribeFromYoutube(String youtubeUrl) {
+    @Value("${vosk.websocket.url}")
+    private String voskUrl;
+
+    @Override
+    public String transcribeFromYouTube(String videoUrl) {
         try {
-            String audioPath = "/tmp/audio.mp3";
-            ProcessBuilder ytDlp = new ProcessBuilder(
-                    "yt-dlp", "-f", "bestaudio",
-                    "--extract-audio", "--audio-format", "mp3",
-                    "-o", audioPath, youtubeUrl
-            );
-            ytDlp.inheritIO().start().waitFor();
+            File audioFile = new File("audio.wav");
+            ProcessBuilder pb = new ProcessBuilder("yt-dlp", "-x", "--audio-format", "wav",
+                    "-o", audioFile.getAbsolutePath(), videoUrl);
+            pb.redirectErrorStream(true);
+            pb.start().waitFor();
 
-            String wavPath = "/tmp/audio.wav";
-            ProcessBuilder ffmpeg = new ProcessBuilder(
-                    "ffmpeg", "-y", "-i", audioPath,
-                    "-ac", "1", "-ar", "16000", wavPath
-            );
-            ffmpeg.inheritIO().start().waitFor();
-
-            return transcribeWithVosk(wavPath);
-
+            return transcribeFile(audioFile);
         } catch (Exception e) {
-            log.error("Transcription failed", e);
-            throw new RuntimeException("Transcription failed: " + e.getMessage(), e);
+            throw new RuntimeException("Transcription failed", e);
         }
     }
 
-    private String transcribeWithVosk(String wavPath) throws IOException {
-        File wavFile = new File(wavPath);
-        if (!wavFile.exists()) throw new FileNotFoundException("Audio file not found: " + wavPath);
+    private String transcribeFile(File audioFile) throws Exception {
+        CompletableFuture<String> resultFuture = new CompletableFuture<>();
+        StandardWebSocketClient client = new StandardWebSocketClient();
 
-        String modelPath = "vosk-model-small-en-us-0.15"; // sudah dicopy ke /app/
-        try (Model model = new Model(modelPath);
-             Recognizer recognizer = new Recognizer(model, 16000.0f);
-             InputStream ais = new FileInputStream(wavFile)) {
-
-            byte[] buffer = new byte[4096];
-            while (true) {
-                int nbytes = ais.read(buffer);
-                if (nbytes < 0) break;
-                recognizer.acceptWaveForm(buffer, nbytes);
+        client.execute(new AbstractWebSocketHandler() {
+            @Override
+            public void handleTextMessage(WebSocketSession session, TextMessage message) {
+                resultFuture.complete(message.getPayload());
+                try { session.close(); } catch (Exception ignored) {}
             }
-            return recognizer.getFinalResult();
-        }
+
+            @Override
+            public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+                try (InputStream input = new FileInputStream(audioFile)) {
+                    byte[] buffer = new byte[8000];
+                    int bytesRead;
+                    while ((bytesRead = input.read(buffer)) != -1) {
+                        session.sendMessage(new BinaryMessage(ByteBuffer.wrap(buffer, 0, bytesRead)));
+                    }
+                    session.sendMessage(new TextMessage("{\"eof\":1}"));
+                }
+            }
+        }, voskUrl).get();
+
+        return resultFuture.get();
     }
 }

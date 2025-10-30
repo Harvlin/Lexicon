@@ -12,9 +12,5 @@ public class TranscriptionController {
 
     private final TranscriptionService transcriptionService;
 
-    @PostMapping
-    public ResponseEntity<String> transcribe(@RequestParam String youtubeUrl) {
-        String transcript = transcriptionService.transcribeFromYoutube(youtubeUrl);
-        return ResponseEntity.ok(transcript);
-    }
+
 }
