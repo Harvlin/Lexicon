@@ -101,6 +101,13 @@
 			<version>7.6.0</version>
 		</dependency>
 
+		<!-- Vosk-Transcription -->
+		<dependency>
+			<groupId>com.alphacephei</groupId>
+			<artifactId>vosk</artifactId>
+			<version>0.3.45</version>
+		</dependency>
+
 		<!-- Testing -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

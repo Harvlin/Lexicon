@@ -22,21 +22,9 @@ services:
       - "11434:11434"
     volumes:
       - ./ollama:/root/.ollama
-
-  faster-whisper:
-    image: lscr.io/linuxserver/faster-whisper:latest
-    container_name: faster-whisper
-    restart: unless-stopped
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-      - WHISPER_MODEL=tiny-int8
-      - WHISPER_BEAM=1
-      - WHISPER_LANG=en
-    volumes:
-      - ./faster-whisper:/config
-      - ./uploads:/data
+  vosk:
+    image: alphacep/kaldi-en:latest
+    container_name: vosk-server
+    restart: always
     ports:
-      - "10300:10300"
-
+      - "2700:2700"

@@ -43,9 +43,12 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authz -> authz
+                .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/user/**").hasAnyRole("USER", "ADMIN", "STUDENT", "PROFESSIONAL", "EDUCATOR")
+                        .requestMatchers("/api/transcribe/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
+                        .requestMatchers("/api/chat/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
                         .requestMatchers("/api/lessons/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
                         .requestMatchers("/api/quiz/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
                         .requestMatchers("/api/flashcards/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
