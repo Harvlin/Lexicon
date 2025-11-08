@@ -1,6 +1,5 @@
 package com.project.Lexicon.service.impl;
 
-import com.project.Lexicon.domain.dto.UserUpdateDto;
 import com.project.Lexicon.domain.entity.User;
 import com.project.Lexicon.repository.UserRepository;
 import com.project.Lexicon.service.UserService;
@@ -48,6 +47,15 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new RuntimeException());
     }
 
+    @Override
+    public Optional<User> findByName(String name) {
+        return userRepository.findByName(name);
+    }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
 
     @Override
     public Optional<User> currentUser() {

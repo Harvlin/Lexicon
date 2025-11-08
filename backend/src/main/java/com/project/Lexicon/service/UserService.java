@@ -8,4 +8,6 @@ public interface UserService {
     User editPersonalInfo(String name, User userUpdate);
     User requireCurrentUser();
     Optional<User> currentUser();
+    Optional<User> findByName(String name);
+    Optional<User> findByEmail(String email);
 }

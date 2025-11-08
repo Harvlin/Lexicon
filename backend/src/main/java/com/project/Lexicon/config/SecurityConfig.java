@@ -20,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Arrays;
 
@@ -47,8 +48,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/user/**").hasAnyRole("USER", "ADMIN", "STUDENT", "PROFESSIONAL", "EDUCATOR")
-                        .requestMatchers("/api/transcribe/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
-                        .requestMatchers("/api/chat/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
+                        .requestMatchers("/api/transcription/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
+                        .requestMatchers("/api/chat/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
+
+                        .requestMatchers("/api/diagnostic/**").permitAll()
+
+                        .requestMatchers("/api/youtube/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
+                        .requestMatchers("/api/process/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
                         .requestMatchers("/api/lessons/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
                         .requestMatchers("/api/quiz/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
                         .requestMatchers("/api/flashcards/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")
@@ -66,30 +72,25 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration configuration = new CorsConfiguration();
-    // Allow local dev frontends (Vite/React) and add more as needed
-    configuration.setAllowedOrigins(Arrays.asList(
-        // Local dev
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:4173",
-        "http://127.0.0.1:4173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-
-        "http://10.189.253.238:5173",
-        "http://10.189.253.238:4173",
-
-        "https://lexigrain.vercel.app",
-        "https://lexigrain-4l9dtj20z-harvlins-projects.vercel.app"
-    ));
-
-    configuration.setAllowedOriginPatterns(Arrays.asList("https://*.vercel.app"));
-    configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
-    configuration.setExposedHeaders(Arrays.asList("Authorization"));
-    configuration.setAllowCredentials(true);
-    configuration.setMaxAge(3600L);
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:4173",
+                "http://127.0.0.1:4173",
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://10.189.253.238:5173",
+                "http://10.189.253.238:4173",
+                "https://lexigrain.vercel.app",
+                "https://lexigrain-4l9dtj20z-harvlins-projects.vercel.app"
+        ));
+        configuration.setAllowedOriginPatterns(Arrays.asList("https://*.vercel.app"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

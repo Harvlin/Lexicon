@@ -1,7 +1,9 @@
 package com.project.Lexicon.service;
 
-import java.util.Map;
+import com.project.Lexicon.domain.entity.Video;
+
+import java.util.List;
 
 public interface YoutubeService {
-    Map<String, String> searchVideos(String query);
+    List<Video> searchVideos(String topic);
 }

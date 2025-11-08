@@ -1,61 +1,146 @@
 package com.project.Lexicon.service.impl;
 
 import com.project.Lexicon.service.TranscriptionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.socket.*;
-import org.springframework.web.socket.client.standard.StandardWebSocketClient;
-import org.springframework.web.socket.handler.AbstractWebSocketHandler;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.*;
-import java.nio.ByteBuffer;
-import java.util.concurrent.CompletableFuture;
+import jakarta.annotation.PostConstruct;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class TranscriptionServiceImpl implements TranscriptionService {
 
-    @Value("${vosk.websocket.url}")
-    private String voskUrl;
+    private static final Logger log = LoggerFactory.getLogger(TranscriptionServiceImpl.class);
 
-    @Override
-    public String transcribeFromYouTube(String videoUrl) {
-        try {
-            File audioFile = new File("audio.wav");
-            ProcessBuilder pb = new ProcessBuilder("yt-dlp", "-x", "--audio-format", "wav",
-                    "-o", audioFile.getAbsolutePath(), videoUrl);
-            pb.redirectErrorStream(true);
-            pb.start().waitFor();
+    @Value("${transcript.service.url:http://localhost:5000}")
+    private String transcriptServiceUrl;
 
-            return transcribeFile(audioFile);
-        } catch (Exception e) {
-            throw new RuntimeException("Transcription failed", e);
+    private final RestTemplate restTemplate;
+
+    private final AtomicBoolean serviceAvailable = new AtomicBoolean(true);
+    private final AtomicLong lastHealthCheck = new AtomicLong(0);
+    private static final long HEALTH_CHECK_INTERVAL = 30000;
+
+    private static final Pattern YOUTUBE_URL_PATTERN = Pattern.compile(
+            "^(https?://)?(www\\.)?(youtube\\.com/watch\\?v=|youtu\\.be/)([a-zA-Z0-9_-]{11}).*$"
+    );
+
+    public TranscriptionServiceImpl(RestTemplateBuilder builder) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10000);   // 10s connect
+        factory.setReadTimeout(180000);     // 3 MINUTES read - be very patient!
+        this.restTemplate = builder.requestFactory(() -> factory).build();
+    }
+
+    @PostConstruct
+    public void init() {
+        log.info("🔍 Checking transcript service at: {}", transcriptServiceUrl);
+        checkServiceHealth();
+
+        if (!serviceAvailable.get()) {
+            log.error("═══════════════════════════════════════════");
+            log.error("⚠️  Transcript service NOT available!");
+            log.error("   Start: python transcript_service.py");
+            log.error("═══════════════════════════════════════════");
+        } else {
+            log.info("✅ Transcript service ready (3min timeout)");
         }
     }
 
-    private String transcribeFile(File audioFile) throws Exception {
-        CompletableFuture<String> resultFuture = new CompletableFuture<>();
-        StandardWebSocketClient client = new StandardWebSocketClient();
+    private boolean checkServiceHealth() {
+        long now = System.currentTimeMillis();
 
-        client.execute(new AbstractWebSocketHandler() {
-            @Override
-            public void handleTextMessage(WebSocketSession session, TextMessage message) {
-                resultFuture.complete(message.getPayload());
-                try { session.close(); } catch (Exception ignored) {}
-            }
+        if (now - lastHealthCheck.get() < HEALTH_CHECK_INTERVAL) {
+            return serviceAvailable.get();
+        }
 
-            @Override
-            public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-                try (InputStream input = new FileInputStream(audioFile)) {
-                    byte[] buffer = new byte[8000];
-                    int bytesRead;
-                    while ((bytesRead = input.read(buffer)) != -1) {
-                        session.sendMessage(new BinaryMessage(ByteBuffer.wrap(buffer, 0, bytesRead)));
-                    }
-                    session.sendMessage(new TextMessage("{\"eof\":1}"));
+        try {
+            String healthUrl = transcriptServiceUrl + "/health";
+            ResponseEntity<Map> response = restTemplate.getForEntity(healthUrl, Map.class);
+
+            boolean healthy = response.getStatusCode().is2xxSuccessful();
+            serviceAvailable.set(healthy);
+            lastHealthCheck.set(now);
+            return healthy;
+
+        } catch (Exception e) {
+            log.debug("Health check failed: {}", e.getMessage());
+            serviceAvailable.set(false);
+            lastHealthCheck.set(now);
+            return false;
+        }
+    }
+
+    @Override
+    public String transcribeFromYouTube(String videoUrl) {
+        if (!isValidYouTubeUrl(videoUrl)) {
+            throw new IllegalArgumentException("Invalid YouTube URL");
+        }
+
+        String videoId = extractVideoId(videoUrl);
+        log.debug("📥 Transcript request: {} (patient mode)", videoId);
+
+        if (!checkServiceHealth()) {
+            throw new RuntimeException("Transcript service unavailable at " + transcriptServiceUrl);
+        }
+
+        return attemptTranscription(videoId);
+    }
+
+    private String attemptTranscription(String videoId) {
+        String url = transcriptServiceUrl + "/transcript?video_id=" + videoId;
+
+        try {
+            log.debug("⏳ Fetching transcript (may take 1-2 minutes)...");
+            long start = System.currentTimeMillis();
+
+            ResponseEntity<Map> resp = restTemplate.getForEntity(url, Map.class);
+            Map<String, Object> body = resp.getBody();
+
+            long duration = System.currentTimeMillis() - start;
+            log.debug("✅ Transcript received in {}ms", duration);
+
+            if (resp.getStatusCode().is2xxSuccessful() && body != null && body.containsKey("transcript")) {
+                String t = (String) body.get("transcript");
+                if (t != null && !t.isBlank()) {
+                    log.info("✅ Transcript: {} chars in {}s", t.length(), duration/1000);
+                    return t;
                 }
             }
-        }, voskUrl).get();
 
-        return resultFuture.get();
+            log.warn("❌ Empty transcript for {}", videoId);
+            return null;
+
+        } catch (Exception e) {
+            log.warn("❌ Transcript failed for {}: {}", videoId, e.getMessage());
+            return null;
+        }
+    }
+
+    private String extractVideoId(String videoUrl) {
+        Matcher matcher = YOUTUBE_URL_PATTERN.matcher(videoUrl);
+        if (matcher.matches()) {
+            return matcher.group(4);
+        }
+        throw new IllegalArgumentException("Cannot extract video ID from: " + videoUrl);
+    }
+
+    private boolean isValidYouTubeUrl(String url) {
+        return url != null && !url.trim().isEmpty() &&
+                YOUTUBE_URL_PATTERN.matcher(url).matches();
+    }
+
+    public boolean isServiceAvailable() {
+        return checkServiceHealth();
     }
 }

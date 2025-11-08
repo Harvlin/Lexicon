@@ -9,6 +9,8 @@ export function VideoDemoSection(){
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ['start end','end start'] });
   const y = useTransform(scrollYProgress,[0,1],[100,-100]);
   const opacity = useTransform(scrollYProgress,[0,0.3,0.7,1],[0,1,1,0]);
+  // Local demo video placed under /public; spaces and parentheses are URL-encoded
+  const demoVideoSrc = encodeURI('/demo lexigrain fixed (1).mp4');
 
   return (
     <section ref={sectionRef} className="relative py-32 overflow-hidden bg-gradient-to-br from-accent/15 via-secondary/15 to-primary/15" id="demo">
@@ -40,7 +42,15 @@ export function VideoDemoSection(){
                   </div>
                 </>
               ) : (
-                <iframe className="w-full h-full" src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1" title="Lexigrain Demo Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                <video
+                  className="w-full h-full object-cover"
+                  src={demoVideoSrc}
+                  controls
+                  autoPlay
+                  playsInline
+                >
+                  Your browser does not support the video tag.
+                </video>
               )}
             </div>
             <motion.div animate={{y:[0,-20,0], rotate:[0,5,0]}} transition={{duration:4, repeat:Infinity, ease:'easeInOut'}} className="absolute -top-6 -right-6 w-24 h-24 bg-accent/40 rounded-2xl opacity-30 blur-xl" />

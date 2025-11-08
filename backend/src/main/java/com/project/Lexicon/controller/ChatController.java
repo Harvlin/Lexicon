@@ -1,10 +1,9 @@
 package com.project.Lexicon.controller;
 
 import com.project.Lexicon.service.OllamaService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -12,23 +11,18 @@ public class ChatController {
 
     private final OllamaService ollamaService;
 
+    @Autowired
     public ChatController(OllamaService ollamaService) {
         this.ollamaService = ollamaService;
     }
 
-    @PostMapping
-    public ResponseEntity<Map<String, String>> chat(@RequestParam String prompt) {
+    @GetMapping("/topic")
+    public ResponseEntity<?> getTopic(@RequestParam String preference) {
         try {
-            String response = ollamaService.generateResponse(prompt);
-            return ResponseEntity.ok(Map.of(
-                    "status", "success",
-                    "response", response
-            ));
+            String topic = ollamaService.getTopic(preference);
+            return ResponseEntity.ok().body(topic);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of(
-                    "status", "error",
-                    "message", e.getMessage()
-            ));
+            return ResponseEntity.status(500).body("Ollama error: " + e.getMessage());
         }
     }
 }
