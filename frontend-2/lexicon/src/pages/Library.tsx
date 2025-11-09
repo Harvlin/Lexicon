@@ -29,6 +29,33 @@ export default function Library() {
   const [sortBy, setSortBy] = useState<SortOption>("recommended");
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("all");
   
+  // Track completion changes to refresh the view
+  const [completionRefresh, setCompletionRefresh] = useState(0);
+  
+  // Listen for localStorage changes to sync completion status
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'lexigrain:completedVideos') {
+        setCompletionRefresh(prev => prev + 1);
+      }
+    };
+    
+    // Custom event for same-window localStorage changes
+    const handleCustomStorageChange = (e: CustomEvent) => {
+      if (e.detail.key === 'lexigrain:completedVideos') {
+        setCompletionRefresh(prev => prev + 1);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('localStorageChange' as any, handleCustomStorageChange as any);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChange' as any, handleCustomStorageChange as any);
+    };
+  }, []);
+  
   // Categories: show fallback immediately, then auto-upgrade to API
   const { data: categoryList } = useServerFirst<string[]>(
     categories,
@@ -119,24 +146,40 @@ export default function Library() {
 
   // Derive display data: prefer API videos when available, otherwise use lessons
   const lessonsView = useMemo(() => {
+    // Load completion status from localStorage
+    const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+    
     if (videos && videos.length > 0) {
-      return videos.map(v => ({
-        id: `api-video-${v.id}`,
-        title: v.title,
-        description: v.channelTitle || v.topic || 'Video lesson',
-        category: v.topic || 'Video',
-        difficulty: mapDifficulty(v.title) as any,
-        duration: 60,
-        progress: 0,
-        thumbnail: '',
-        type: 'video' as const,
-        tags: [v.channelTitle, v.topic].filter(Boolean) as string[],
-        isFavorite: false,
-        videoUrl: toEmbedUrl(v.videoId, v.videoUrl),
-      }));
+      return videos.map(v => {
+        const lessonId = `api-video-${v.id}`;
+        const isCompleted = !!completedVideos[lessonId];
+        
+        return {
+          id: lessonId,
+          title: v.title,
+          description: v.channelTitle || v.topic || 'Video lesson',
+          category: v.topic || 'Video',
+          difficulty: mapDifficulty(v.title) as any,
+          duration: v.duration || 60, // Use real duration from backend, fallback to 60
+          progress: isCompleted ? 100 : 0,
+          thumbnail: '',
+          type: 'video' as const,
+          tags: [v.channelTitle, v.topic].filter(Boolean) as string[],
+          isFavorite: false,
+          videoUrl: toEmbedUrl(v.videoId, v.videoUrl),
+        };
+      });
     }
-    return lessons;
-  }, [videos, lessons]);
+    
+    // For regular lessons, also check completion status
+    return lessons.map(l => {
+      const isCompleted = !!completedVideos[l.id];
+      return {
+        ...l,
+        progress: isCompleted ? 100 : l.progress
+      };
+    });
+  }, [videos, lessons, completionRefresh]); // Add completionRefresh as dependency
 
   // Track favorite state separately for optimistic updates
   const [favoriteOverrides, setFavoriteOverrides] = useState<Record<string, boolean>>({});

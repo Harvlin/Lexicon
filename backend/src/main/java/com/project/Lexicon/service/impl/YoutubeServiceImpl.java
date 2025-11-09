@@ -512,4 +512,111 @@ public class YoutubeServiceImpl implements YoutubeService {
 
         return videos;
     }
+
+    /**
+     * Get video durations from YouTube API
+     * Fetches duration for multiple videos in a single batch request (up to 50 videos)
+     */
+    @Override
+    public Map<String, Integer> getVideoDurations(List<String> videoIds) {
+        Map<String, Integer> durations = new HashMap<>();
+        
+        if (videoIds == null || videoIds.isEmpty()) {
+            return durations;
+        }
+
+        try {
+            // YouTube API supports up to 50 video IDs per request
+            String idsParam = String.join(",", videoIds);
+            
+            String url = UriComponentsBuilder
+                    .fromHttpUrl("https://www.googleapis.com/youtube/v3/videos")
+                    .queryParam("part", "contentDetails")
+                    .queryParam("id", idsParam)
+                    .queryParam("key", apiKey)
+                    .toUriString();
+
+            logger.info("🕒 Fetching durations for {} videos from YouTube API", videoIds.size());
+            
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> body = response.getBody();
+                List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
+                
+                if (items != null) {
+                    for (Map<String, Object> item : items) {
+                        try {
+                            String videoId = (String) item.get("id");
+                            Map<String, Object> contentDetails = (Map<String, Object>) item.get("contentDetails");
+                            
+                            if (contentDetails != null && contentDetails.containsKey("duration")) {
+                                String isoDuration = (String) contentDetails.get("duration");
+                                int minutes = parseIsoDuration(isoDuration);
+                                durations.put(videoId, minutes);
+                                logger.debug("  Video {}: {} minutes", videoId, minutes);
+                            }
+                        } catch (Exception e) {
+                            logger.warn("Failed to parse duration for video: {}", e.getMessage());
+                        }
+                    }
+                }
+                
+                logger.info("✅ Successfully fetched {} durations", durations.size());
+            }
+        } catch (Exception e) {
+            logger.error("❌ Failed to fetch video durations: {}", e.getMessage());
+        }
+        
+        return durations;
+    }
+
+    /**
+     * Parse ISO 8601 duration format (e.g., "PT1H30M45S") to minutes
+     */
+    private int parseIsoDuration(String isoDuration) {
+        if (isoDuration == null || isoDuration.isEmpty()) {
+            return 0;
+        }
+        
+        try {
+            // Remove PT prefix
+            String duration = isoDuration.replace("PT", "");
+            
+            int hours = 0;
+            int minutes = 0;
+            int seconds = 0;
+            
+            // Extract hours (e.g., "1H30M45S" -> 1)
+            if (duration.contains("H")) {
+                int hIndex = duration.indexOf("H");
+                hours = Integer.parseInt(duration.substring(0, hIndex));
+                duration = duration.substring(hIndex + 1);
+            }
+            
+            // Extract minutes (e.g., "30M45S" -> 30)
+            if (duration.contains("M")) {
+                int mIndex = duration.indexOf("M");
+                minutes = Integer.parseInt(duration.substring(0, mIndex));
+                duration = duration.substring(mIndex + 1);
+            }
+            
+            // Extract seconds (e.g., "45S" -> 45)
+            if (duration.contains("S")) {
+                int sIndex = duration.indexOf("S");
+                seconds = Integer.parseInt(duration.substring(0, sIndex));
+            }
+            
+            // Convert to total minutes (round up if seconds > 30)
+            int totalMinutes = hours * 60 + minutes;
+            if (seconds > 30) {
+                totalMinutes += 1;
+            }
+            
+            return totalMinutes;
+        } catch (Exception e) {
+            logger.warn("Failed to parse ISO duration '{}': {}", isoDuration, e.getMessage());
+            return 0;
+        }
+    }
 }

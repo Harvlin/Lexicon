@@ -155,6 +155,7 @@ export interface StudyVideoDTO {
   hasQuestions: boolean;
   hasFlashcards: boolean;
   hasSummary: boolean;
+  duration?: number; // Duration in minutes from YouTube API
 }
 
 export interface StudyVideosResponseDTO {

@@ -36,6 +36,7 @@ export default function Lesson() {
     if (isStudyVideo) {
       const numericId = Number(id.replace('api-video-', ''));
       if (Number.isNaN(numericId)) return;
+      
       endpoints.studyMaterials.video(numericId)
         .then(detail => {
           setVideoDetail(detail);
@@ -64,19 +65,25 @@ export default function Lesson() {
             } catch {}
             return url;
           };
+          
+          // Check completion from localStorage
+          const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+          const isCompleted = completedVideos[id];
+          
           const mapped: LessonDTO = {
             id: id,
             title: v.title,
             description: v.summary?.content || v.topic || v.channelTitle || 'Video lesson',
             category: v.topic || 'Video',
             difficulty: 'beginner', // Heuristic; could refine later
-            duration: 60,
-            progress: 0,
+            duration: v.duration || 60, // Use real duration from backend, fallback to 60
+            progress: isCompleted ? 100 : 0,
             thumbnail: '',
             type: 'video',
             tags: [v.channelTitle, v.topic].filter(Boolean) as string[],
             isFavorite: false,
             videoUrl: toEmbedUrl(v.videoId, v.videoUrl),
+            completedAt: isCompleted?.completedAt
           };
           setLesson(mapped);
         })
@@ -105,24 +112,87 @@ export default function Lesson() {
 
   const handleCompleteLesson = () => {
     if (!lesson) return;
-    // Only attempt completion API for regular lessons (not mapped study-material videos)
+    
+    // Call backend API to mark as completed
     if (isStudyVideo) {
-      // Optimistic local completion only
+      const numericId = Number(id?.replace('api-video-', ''));
+      if (!Number.isNaN(numericId)) {
+        endpoints.studyMaterials.completeVideo(numericId)
+          .then(() => {
+            // Update UI state
+            setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
+            
+            // Also save to localStorage for immediate UI feedback
+            const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+            completedVideos[lesson.id] = {
+              completedAt: new Date().toISOString(),
+              title: lesson.title,
+              duration: lesson.duration
+            };
+            localStorage.setItem('lexigrain:completedVideos', JSON.stringify(completedVideos));
+            
+            // Dispatch custom event for same-window sync
+            window.dispatchEvent(new CustomEvent('localStorageChange', {
+              detail: { key: 'lexigrain:completedVideos' }
+            }));
+            
+            toast.success("Lesson completed! 🎉", { 
+              description: `Great job finishing "${lesson.title}"!`,
+              duration: 4000
+            });
+          })
+          .catch((err) => {
+            console.error('Failed to mark video as complete:', err);
+            
+            // Still save locally even if backend fails
+            const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+            completedVideos[lesson.id] = {
+              completedAt: new Date().toISOString(),
+              title: lesson.title,
+              duration: lesson.duration
+            };
+            localStorage.setItem('lexigrain:completedVideos', JSON.stringify(completedVideos));
+            setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
+            
+            // Dispatch custom event for same-window sync
+            window.dispatchEvent(new CustomEvent('localStorageChange', {
+              detail: { key: 'lexigrain:completedVideos' }
+            }));
+            
+            // Show appropriate error message
+            if (err.message && err.message.includes('401')) {
+              toast.warning("Lesson completed locally", {
+                description: "Please log in to sync with the server"
+              });
+            } else {
+              toast.success("Lesson completed! 🎉", { 
+                description: "Saved locally",
+                duration: 4000
+              });
+            }
+          });
+      }
+    } else {
+      // For non-video lessons, just save locally
+      const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+      completedVideos[lesson.id] = {
+        completedAt: new Date().toISOString(),
+        title: lesson.title,
+        duration: lesson.duration
+      };
+      localStorage.setItem('lexigrain:completedVideos', JSON.stringify(completedVideos));
       setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
-      toast.success("Marked video as completed locally.");
-      return;
-    }
-    const prev = lesson;
-    setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
-    endpoints.lessons
-      .complete(lesson.id)
-      .then(() => {
-        toast.success("Lesson completed! 🎉", { description: "Progress updated." });
-      })
-      .catch(() => {
-        setLesson(prev);
-        toast.error("Failed to mark as complete");
+      
+      // Dispatch custom event for same-window sync
+      window.dispatchEvent(new CustomEvent('localStorageChange', {
+        detail: { key: 'lexigrain:completedVideos' }
+      }));
+      
+      toast.success("Lesson completed! 🎉", { 
+        description: `Great job finishing "${lesson.title}"!`,
+        duration: 4000
       });
+    }
   };
 
   return (
@@ -141,6 +211,14 @@ export default function Lesson() {
             <div className="flex items-center gap-2 mb-2">
               <Badge>{lesson.category}</Badge>
               <Badge variant="outline">{lesson.difficulty}</Badge>
+              {lesson.duration && lesson.duration > 0 && (
+                <Badge variant="secondary" className="gap-1">
+                  <Clock className="h-3 w-3" />
+                  {Math.floor(lesson.duration / 60) > 0 
+                    ? `${Math.floor(lesson.duration / 60)}h${lesson.duration % 60 ? ` ${lesson.duration % 60}m` : ''}`
+                    : `${lesson.duration}m`}
+                </Badge>
+              )}
             </div>
             <h1 className="text-4xl font-heading font-bold mb-3">
               {lesson.title}

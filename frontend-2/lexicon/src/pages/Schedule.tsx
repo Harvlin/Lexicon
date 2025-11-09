@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { ChevronLeft, ChevronRight, RefreshCcw, Plus, CheckCircle2, Clock, Loader2, Trash2, CalendarDays, Settings, TrendingUp, Target, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
 
 function formatWeekLabel(weekId: string) {
   return weekId.replace('-W', ' • Week ');
@@ -69,7 +70,7 @@ export default function SchedulePage() {
             description: `${video.channelTitle} - ${video.topic}`,
             category: video.topic,
             difficulty: 'beginner',
-            duration: 30, // Default duration
+            duration: video.duration || 30, // Use real duration from backend, fallback to 30
             progress: 0,
             thumbnail: '🎥',
             type: 'video',
@@ -166,6 +167,21 @@ export default function SchedulePage() {
   const [specificTime, setSpecificTime] = useState<string>('19:00');
   const [dailyHours, setDailyHours] = useState<number>(1);
   const [reminderEnabled, setReminderEnabled] = useState<boolean>(false);
+  
+  // Track completion changes to refresh the view
+  const [completionRefresh, setCompletionRefresh] = useState(0);
+  
+  // Listen for localStorage changes to sync completion status
+  useEffect(() => {
+    const handleCustomStorageChange = (e: CustomEvent) => {
+      if (e.detail.key === 'lexigrain:completedVideos') {
+        setCompletionRefresh(prev => prev + 1);
+      }
+    };
+    
+    window.addEventListener('localStorageChange' as any, handleCustomStorageChange as any);
+    return () => window.removeEventListener('localStorageChange' as any, handleCustomStorageChange as any);
+  }, []);
 
   // Load onboarding preferences
   useEffect(() => {
@@ -192,6 +208,21 @@ export default function SchedulePage() {
 
   const daySessions = useMemo(() => sessions.filter(s => s.date === selectedISO).sort((a,b) => a.createdAt.localeCompare(b.createdAt)), [sessions, selectedISO]);
 
+  // Sync completion status from localStorage on component mount
+  useEffect(() => {
+    const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+    
+    // For each completed video in localStorage, check if there's a session that should be marked as done
+    Object.keys(completedVideos).forEach(videoId => {
+      sessions.forEach(session => {
+        if (session.lessonId === videoId && session.status !== 'done') {
+          // Mark the session as done to sync with localStorage
+          setStatus(session.id, 'done');
+        }
+      });
+    });
+  }, []); // Only run once on mount
+
   const hasSessionsDates = useMemo(() => new Set(sessions.map(s => s.date)), [sessions]);
   const completedDates = useMemo(() => new Set(sessions.filter(s => s.status==='done').map(s => s.date)), [sessions]);
 
@@ -202,6 +233,50 @@ export default function SchedulePage() {
     setSubmitting(false);
     setOpenAdd(false);
     setLessonId(''); setMinutes(60);
+  };
+
+  // Handle session completion with toast feedback
+  const handleCompleteSession = (sessionId: string, currentStatus: string, lessonTitle: string, lessonId: string) => {
+    const newStatus = currentStatus === 'done' ? 'planned' : 'done';
+    setStatus(sessionId, newStatus);
+    
+    if (newStatus === 'done') {
+      // Also update localStorage for consistency with Lesson page
+      const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+      if (!completedVideos[lessonId]) {
+        completedVideos[lessonId] = {
+          completedAt: new Date().toISOString(),
+          title: lessonTitle,
+          duration: lessonsById[lessonId]?.duration || 0
+        };
+        localStorage.setItem('lexigrain:completedVideos', JSON.stringify(completedVideos));
+        
+        // Dispatch custom event for same-window sync
+        window.dispatchEvent(new CustomEvent('localStorageChange', {
+          detail: { key: 'lexigrain:completedVideos' }
+        }));
+      }
+      
+      toast.success("Session completed! 🎉", {
+        description: `Great work on "${lessonTitle}"`,
+        duration: 3000
+      });
+    } else {
+      // Remove from localStorage when unmarking as complete
+      const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+      delete completedVideos[lessonId];
+      localStorage.setItem('lexigrain:completedVideos', JSON.stringify(completedVideos));
+      
+      // Dispatch custom event for same-window sync
+      window.dispatchEvent(new CustomEvent('localStorageChange', {
+        detail: { key: 'lexigrain:completedVideos' }
+      }));
+      
+      toast.info("Session marked as planned", {
+        description: `"${lessonTitle}" moved back to planned`,
+        duration: 2000
+      });
+    }
   };
 
   // On initial load only: if starting on a day with no sessions, move to earliest session date once.
@@ -480,13 +555,22 @@ export default function SchedulePage() {
                           <Badge variant={s.status === 'done' ? 'default' : 'secondary'} className="text-[10px] font-medium">
                             {s.status}
                           </Badge>
+                          {lesson?.duration && lesson.duration > 0 && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {minutesToHhMm(lesson.duration)}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <Button 
                           size="sm" 
                           variant={s.status==='done' ? 'default':'outline'} 
-                          onClick={() => setStatus(s.id, s.status==='done' ? 'planned' : 'done')} 
+                          onClick={() => handleCompleteSession(s.id, s.status, lesson?.title || 'Lesson', s.lessonId)} 
                           className={cn(
                             'h-8 text-xs font-medium transition-all',
                             s.status === 'done' && 'bg-success hover:brightness-95 text-white'
@@ -589,6 +673,15 @@ export default function SchedulePage() {
                         <Badge variant={s.status === 'done' ? 'default' : 'secondary'} className="text-[9px] h-4 px-1.5">
                           {s.status}
                         </Badge>
+                        {lesson?.duration && lesson.duration > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {minutesToHhMm(lesson.duration)}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </button>
                   );

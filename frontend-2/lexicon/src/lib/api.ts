@@ -178,6 +178,7 @@ export const endpoints = {
     videos: () => api.get<StudyVideosResponseDTO>(`/study-materials/videos`),
     videosByTopic: (topic: string) => api.get<StudyVideosResponseDTO>(`/study-materials/videos/topic/${encodeURIComponent(topic)}`),
     video: (videoId: number) => api.get<StudyVideoDetailResponseDTO>(`/study-materials/videos/${videoId}`),
+    completeVideo: (videoId: number) => api.post<{ status: string; message: string; videoId: number; completedAt: string }>(`/study-materials/videos/${videoId}/complete`),
     videoQuestions: (videoId: number) => api.get<{ status: string; videoId: number; count: number; questions: StudyVideoQuestionDTO[] }>(`/study-materials/videos/${videoId}/questions`),
     videoFlashcards: (videoId: number) => api.get<{ status: string; videoId: number; count: number; flashcards: StudyFlashcardDTO[] }>(`/study-materials/videos/${videoId}/flashcards`),
     learningPlans: () => api.get<{ status: string; count: number; plans: { id: number; topic: string; userPreference: string; planContent: string; createdAt: string }[] }>(`/study-materials/learning-plans`),

@@ -1,6 +1,7 @@
 package com.project.Lexicon.controller;
 
 import com.project.Lexicon.domain.entity.Lesson;
+import com.project.Lexicon.domain.entity.Progress;
 import com.project.Lexicon.domain.entity.User;
 import com.project.Lexicon.service.LessonService;
 import com.project.Lexicon.service.UserService;
@@ -26,20 +27,42 @@ public class LessonController {
     private final LessonService lessonService;
     private final UserService userService;
 
-    /**
-     * Get all lessons - required by frontend Schedule page
-     */
     @GetMapping({"", "/list"})
-    public ResponseEntity<?> getAllLessons(Authentication authentication) {
+    public ResponseEntity<?> getAllLessons(
+            @RequestParam(required = false) Boolean completed,
+            @RequestParam(required = false) Boolean inProgress,
+            @RequestParam(required = false, defaultValue = "50") Integer limit,
+            Authentication authentication) {
+
         try {
             User user = getAuthenticatedUser(authentication);
-            log.info("User {} fetching all lessons", user.getEmail());
-            
-            List<Lesson> lessons = lessonService.getAllLessons();
-            
-            List<Map<String, Object>> lessonsList = lessons.stream()
-                    .map(this::lessonToMap)
-                    .collect(Collectors.toList());
+            log.info("User {} fetching lessons (completed={}, inProgress={}, limit={})",
+                    user.getEmail(), completed, inProgress, limit);
+
+            List<Map<String, Object>> lessonsList;
+
+            if (Boolean.TRUE.equals(completed)) {
+                // Get completed lessons from Progress table
+                lessonsList = lessonService.getCompletedLessons(user, limit)
+                        .stream()
+                        .map(this::lessonToMapWithProgress)
+                        .collect(Collectors.toList());
+
+            } else if (Boolean.TRUE.equals(inProgress)) {
+                // Get in-progress lessons from Progress table
+                lessonsList = lessonService.getInProgressLessons(user, limit)
+                        .stream()
+                        .map(this::lessonToMapWithProgress)
+                        .collect(Collectors.toList());
+
+            } else {
+                // Get all lessons
+                lessonsList = lessonService.getAllLessons()
+                        .stream()
+                        .limit(limit)
+                        .map(this::lessonToMap)
+                        .collect(Collectors.toList());
+            }
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
@@ -54,9 +77,6 @@ public class LessonController {
         }
     }
 
-    /**
-     * Get a specific lesson by ID
-     */
     @GetMapping("/{id}")
     public ResponseEntity<?> getLesson(
             @PathVariable Long id,
@@ -80,11 +100,6 @@ public class LessonController {
         }
     }
 
-    // =============== HELPER METHODS ===============
-
-    /**
-     * Get authenticated user - handles both email and username from JWT
-     */
     private User getAuthenticatedUser(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new RuntimeException("User not authenticated");
@@ -98,10 +113,13 @@ public class LessonController {
                 .orElseThrow(() -> new RuntimeException("User not found: " + principal));
     }
 
-    /**
-     * Convert Lesson entity to Map for JSON response
-     * Matches frontend LessonDTO interface
-     */
+    private Map<String, Object> lessonToMapWithProgress(Progress progress) {
+        Map<String, Object> map = lessonToMap(progress.getLesson());
+        map.put("progress", progress.getProgressPercent());
+        map.put("completedAt", progress.getCompletedAt());
+        return map;
+    }
+
     private Map<String, Object> lessonToMap(Lesson lesson) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", String.valueOf(lesson.getId())); // Frontend expects string ID
