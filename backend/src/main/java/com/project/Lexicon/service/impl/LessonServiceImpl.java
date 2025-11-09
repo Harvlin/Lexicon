@@ -16,7 +16,7 @@ import java.util.List;
 @Slf4j
 public class LessonServiceImpl implements LessonService {
 
-    private LessonRepository lessonRepository;
+    private final LessonRepository lessonRepository;
 
     @Autowired
     public LessonServiceImpl(LessonRepository lessonRepository) {

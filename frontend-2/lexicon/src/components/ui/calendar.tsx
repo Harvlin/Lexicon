@@ -32,14 +32,14 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         // Make day cells simple, with larger click target and subtle hover
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-10 w-10 p-0 font-medium rounded-md hover:bg-muted aria-selected:opacity-100"
+          "h-10 w-10 p-0 font-medium rounded-lg hover:bg-accent/50 aria-selected:opacity-100 transition-all"
         ),
         day_range_end: "day-range-end",
-        // Selected day: ring instead of solid fill to avoid clashing with modifiers
+        // Selected day: gradient background with bold text
         day_selected:
-          "ring-2 ring-primary ring-offset-2 ring-offset-background bg-transparent text-foreground",
-        // Today: subtle ring if not selected
-        day_today: "ring-1 ring-ring text-foreground",
+          "bg-gradient-primary text-white hover:opacity-90 font-bold shadow-sm",
+        // Today: subtle outline if not selected
+        day_today: "ring-1 ring-primary/50 text-foreground font-semibold",
         // Outside: dim
         day_outside: "day-outside text-muted-foreground opacity-40",
         day_disabled: "text-muted-foreground opacity-50",

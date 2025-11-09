@@ -9,12 +9,13 @@ import { ProgressRing } from "@/components/dashboard/ProgressRing";
 import { mockLessons, mockProgress, mockUser } from "@/lib/mockData";
 import { endpoints } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { LessonDTO, UserDTO, UserProgressSummaryDTO } from "@/lib/types";
+import type { LessonDTO, UserDTO, UserProgressSummaryDTO, StudyVideoDTO } from "@/lib/types";
 import heroBanner from "@/assets/hero-banner.jpg";
 
 export default function Dashboard() {
   const { user: authUser } = useAuth();
-  const [lessons, setLessons] = useState<LessonDTO[]>(mockLessons);
+  const [lessons, setLessons] = useState<LessonDTO[]>([]);
+  const [videos, setVideos] = useState<StudyVideoDTO[]>([]);
   const [user, setUser] = useState<UserDTO | null>(authUser);
   const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
 
@@ -34,10 +35,18 @@ export default function Dashboard() {
       .then(setProgress)
       .catch(() => setProgress(mockProgress));
 
+    // Fetch study-material videos if user is authenticated
+    if (authUser) {
+      endpoints.studyMaterials.videos()
+        .then((res) => setVideos(res.videos || []))
+        .catch(() => setVideos([]));
+    }
+
+    // Fetch lessons (fallback to empty if endpoint not available)
     endpoints.lessons
       .list({ limit: 20, sort: "recent" })
-      .then((res) => setLessons(res.items))
-      .catch(() => setLessons(mockLessons));
+      .then((res) => setLessons(res.items || []))
+      .catch(() => setLessons([]));
   }, [authUser]);
 
   const handleToggleFavorite = (id: string) => {
@@ -47,21 +56,66 @@ export default function Dashboard() {
         lesson.id === id ? { ...lesson, isFavorite: !lesson.isFavorite } : lesson
       )
     );
-    endpoints.lessons.toggleFavorite(id).catch(() => {
-      // revert on error
-      setLessons((prev) =>
-        prev.map((lesson) =>
-          lesson.id === id ? { ...lesson, isFavorite: !lesson.isFavorite } : lesson
-        )
-      );
-    });
+    if (!id.startsWith('api-video-')) {
+      endpoints.lessons.toggleFavorite(id).catch(() => {
+        // revert on error
+        setLessons((prev) =>
+          prev.map((lesson) =>
+            lesson.id === id ? { ...lesson, isFavorite: !lesson.isFavorite } : lesson
+          )
+        );
+      });
+    }
   };
 
-  const recommendedLessons = lessons
+  // Map API videos to LessonDTO with embed URLs
+  const toEmbedUrl = (videoId?: string, url?: string): string => {
+    if (videoId && videoId.trim()) return `https://www.youtube.com/embed/${videoId.trim()}?rel=0`;
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('youtube.com')) {
+        if (u.pathname.startsWith('/watch')) {
+          const id = u.searchParams.get('v');
+          if (id) return `https://www.youtube.com/embed/${id}?rel=0`;
+        }
+        if (u.pathname.startsWith('/shorts/')) {
+          const id = u.pathname.split('/')[2];
+          if (id) return `https://www.youtube.com/embed/${id}?rel=0`;
+        }
+        if (u.pathname.startsWith('/embed/')) return url;
+      }
+      if (u.hostname === 'youtu.be') {
+        const id = u.pathname.replace('/', '');
+        if (id) return `https://www.youtube.com/embed/${id}?rel=0`;
+      }
+    } catch {}
+    return url;
+  };
+
+  const videoLessons: LessonDTO[] = videos.map(v => ({
+    id: `api-video-${v.id}`,
+    title: v.title,
+    description: v.channelTitle || v.topic || 'Video lesson',
+    category: v.topic || 'Video',
+    difficulty: 'beginner',
+    duration: 60,
+    progress: 0,
+    thumbnail: '',
+    type: 'video',
+    tags: [v.channelTitle, v.topic].filter(Boolean) as string[],
+    isFavorite: false,
+    videoUrl: toEmbedUrl(v.videoId, v.videoUrl),
+  }));
+
+  // Combine API videos with regular lessons
+  const allContent = [...videoLessons, ...lessons];
+
+  const continueLearning = allContent
     .filter((l) => l.progress > 0 && l.progress < 100)
     .slice(0, 3);
 
-  const newLessons = lessons
+  const recommended = allContent
     .filter((l) => l.progress === 0)
     .slice(0, 3);
 
@@ -215,14 +269,14 @@ export default function Dashboard() {
       </Card>
 
       {/* Continue Learning */}
-      {recommendedLessons.length > 0 && (
+      {continueLearning.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-heading font-bold">Continue Learning</h2>
             <Button variant="ghost" size="sm">View All</Button>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {recommendedLessons.map((lesson) => (
+            {continueLearning.map((lesson) => (
               <LessonCard
                 key={lesson.id}
                 lesson={lesson}
@@ -234,14 +288,14 @@ export default function Dashboard() {
       )}
 
       {/* Recommended for You */}
-      {newLessons.length > 0 && (
+      {recommended.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-heading font-bold">Recommended for You</h2>
             <Button variant="ghost" size="sm">View All</Button>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {newLessons.map((lesson) => (
+            {recommended.map((lesson) => (
               <LessonCard
                 key={lesson.id}
                 lesson={lesson}

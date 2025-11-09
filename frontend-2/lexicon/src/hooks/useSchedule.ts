@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { mockLessons } from '@/lib/mockData';
 import { endpoints } from '@/lib/api';
-import type { ScheduleSessionDTO, ScheduleWeekDTO } from '@/lib/types';
+import type { ScheduleSessionDTO, ScheduleWeekDTO, LessonDTO } from '@/lib/types';
 
 /**
  * Schedule session domain model
  */
 export interface ScheduleSession {
-  id: string;              // uuid
-  lessonId: string;        // reference to lesson
+  id: string;              // uuid or DB id
+  lessonId: string;        // reference to lesson (supports both mock IDs and "lesson-X" format)
   date: string;            // ISO date (yyyy-mm-dd)
   plannedMinutes: number;  // planned study duration
   actualMinutes?: number;  // real time spent
@@ -22,8 +22,26 @@ interface WeekData { sessions: ScheduleSession[]; source?: 'onboarding' | 'mock'
 
 // Prefer new brand key; migrate legacy if present
 const STORAGE_KEY = 'lexigrain:schedule:v1';
+const LESSONS_CACHE_KEY = 'lexigrain:lessons:cache';
 
 interface StoredShape { [weekId: string]: WeekData }
+
+// Helper: normalize lesson ID for backend (ensure "lesson-X" format)
+function normalizeLessonId(id: string): string {
+  // If already in "lesson-X" format, return as-is
+  if (id.startsWith('lesson-')) return id;
+  // If numeric or other format, convert to "lesson-X"
+  const numMatch = id.match(/^\d+$/);
+  if (numMatch) return `lesson-${id}`;
+  // Otherwise assume it's already a valid format
+  return id;
+}
+
+// Helper: extract numeric ID from "lesson-X" format
+function extractLessonNumber(id: string): string {
+  if (id.startsWith('lesson-')) return id.substring(7);
+  return id;
+}
 
 // Helper: get week id (ISO year-week)
 export function getWeekId(date: Date) {
@@ -104,7 +122,7 @@ function generateWeekFromOnboarding(weekId: string): WeekData {
         const lesson2 = lessonsPool[(i+1) % lessonsPool.length];
         sessions.push({
           id: safeUuid(),
-          lessonId: lesson.id,
+          lessonId: normalizeLessonId(lesson.id),
           date: isoDate,
           plannedMinutes: first,
           status: 'planned',
@@ -114,7 +132,7 @@ function generateWeekFromOnboarding(weekId: string): WeekData {
         });
         sessions.push({
           id: safeUuid(),
-          lessonId: lesson2.id,
+          lessonId: normalizeLessonId(lesson2.id),
           date: isoDate,
           plannedMinutes: second,
           status: 'planned',
@@ -125,7 +143,7 @@ function generateWeekFromOnboarding(weekId: string): WeekData {
       } else {
         sessions.push({
           id: safeUuid(),
-          lessonId: lesson.id,
+          lessonId: normalizeLessonId(lesson.id),
           date: isoDate,
           plannedMinutes: dayMinutes,
           status: 'planned',
@@ -196,8 +214,9 @@ export function useSchedule(initialDate: Date = new Date()): UseScheduleApi {
         const serverWeek = await endpoints.schedule.getWeek(weekId);
         setStore(prev => ({ ...prev, [weekId]: { sessions: serverWeek.sessions as any, source: 'api' } }));
         return;
-      } catch {
-        // ignore and fallback to local
+      } catch (err) {
+        // Log warning but don't fail - fallback to local
+        console.warn('Could not fetch week from backend, using local data:', (err as Error).message);
       }
       setStore(prev => {
         if (prev[weekId]) return prev;
@@ -216,7 +235,9 @@ export function useSchedule(initialDate: Date = new Date()): UseScheduleApi {
     const current = next[weekId];
     if (current) {
       const payload: ScheduleWeekDTO = { weekId, sessions: current.sessions as unknown as ScheduleSessionDTO[], source: 'onboarding' };
-      endpoints.schedule.saveWeek(weekId, payload).catch(() => {});
+      endpoints.schedule.saveWeek(weekId, payload).catch((err) => {
+        console.warn('Failed to sync week to backend:', (err as Error).message);
+      });
     }
   }, [weekId]);
 
@@ -236,7 +257,7 @@ export function useSchedule(initialDate: Date = new Date()): UseScheduleApi {
   const addSession: UseScheduleApi['addSession'] = useCallback((input) => {
     const newSession: ScheduleSessionDTO = {
       id: safeUuid(),
-      lessonId: input.lessonId,
+      lessonId: normalizeLessonId(input.lessonId),
       date: input.date,
       plannedMinutes: input.plannedMinutes,
       status: (input as any).status ?? 'planned',
@@ -254,18 +275,24 @@ export function useSchedule(initialDate: Date = new Date()): UseScheduleApi {
       actualMinutes: newSession.actualMinutes,
       focusTag: newSession.focusTag,
     } as Omit<ScheduleSessionDTO, 'id' | 'createdAt' | 'updatedAt'>;
-    endpoints.schedule.addSession(weekId, payload).catch(() => {});
+    endpoints.schedule.addSession(weekId, payload).catch((err) => {
+      console.warn('Failed to sync session to backend:', err.message);
+    });
   }, [mutateWeek, weekId]);
 
   const updateSession: UseScheduleApi['updateSession'] = useCallback((id, patch) => {
     const withTs = { ...patch, updatedAt: new Date().toISOString() } as Partial<ScheduleSessionDTO>;
     mutateWeek(sessions => sessions.map(s => s.id === id ? { ...s, ...withTs } : s));
-    endpoints.schedule.updateSession(weekId, id, withTs).catch(() => {});
+    endpoints.schedule.updateSession(weekId, id, withTs).catch((err) => {
+      console.warn('Failed to sync session update to backend:', err.message);
+    });
   }, [mutateWeek, weekId]);
 
   const deleteSession: UseScheduleApi['deleteSession'] = useCallback((id) => {
     mutateWeek(sessions => sessions.filter(s => s.id !== id));
-    endpoints.schedule.deleteSession(weekId, id).catch(() => {});
+    endpoints.schedule.deleteSession(weekId, id).catch((err) => {
+      console.warn('Failed to sync session deletion to backend:', err.message);
+    });
   }, [mutateWeek, weekId]);
 
   const setStatus: UseScheduleApi['setStatus'] = useCallback((id, status) => {
@@ -331,7 +358,7 @@ export function useSchedule(initialDate: Date = new Date()): UseScheduleApi {
         replace.push({
           ...s,
           id: safeUuid(),
-          lessonId: alt.id,
+          lessonId: normalizeLessonId(alt.id),
           plannedMinutes: second,
           status: 'planned',
           focusTag: 'part 2',
@@ -373,7 +400,7 @@ export function useSchedule(initialDate: Date = new Date()): UseScheduleApi {
       const monday = mondayFromWeekId(weekId);
       const mock: ScheduleSession[] = mockLessons.slice(0,3).map((lesson, idx) => ({
         id: safeUuid(),
-        lessonId: lesson.id,
+        lessonId: normalizeLessonId(lesson.id),
         date: toISODate(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+idx)),
         plannedMinutes: 45,
         status: 'planned',

@@ -143,3 +143,100 @@ export interface MessageResponseDTO {
   message: string;
 }
 
+// Study Materials (Videos)
+export interface StudyVideoDTO {
+  id: number;
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  videoUrl: string;
+  topic: string;
+  createdAt: string;
+  hasQuestions: boolean;
+  hasFlashcards: boolean;
+  hasSummary: boolean;
+}
+
+export interface StudyVideosResponseDTO {
+  status: string;
+  count: number;
+  videos: StudyVideoDTO[];
+}
+
+export interface StudyVideoQuestionDTO {
+  id: number;
+  questionNumber: number;
+  question: string;
+  answer: string;
+}
+
+export interface StudyFlashcardDTO {
+  id: number;
+  cardNumber: number;
+  front: string;
+  back: string;
+}
+
+export interface StudyVideoDetailDTO extends StudyVideoDTO {
+  summary?: {
+    content: string;
+    length: number;
+  };
+  questions?: StudyVideoQuestionDTO[];
+  flashcards?: StudyFlashcardDTO[];
+}
+
+export interface StudyVideoDetailResponseDTO {
+  status: string;
+  video: StudyVideoDetailDTO;
+}
+
+// Process endpoint results
+export interface ProcessMaterialVideoDTO {
+  videoNumber: number;
+  title: string;
+  channel: string;
+  url: string;
+  videoId: string;
+  transcript?: {
+    fullLength: number;
+    preview: string;
+  };
+  summary?: {
+    content: string;
+    length?: number;
+  };
+  studyMaterials?: unknown; // structure is dynamic (quiz + flashcards combined); can narrow later
+  status: string; // success | failed
+  processingTimeMs: number;
+  error?: string;
+}
+
+export interface ProcessResponseDTO {
+  status: string; // success | error
+  userPreference: string;
+  generatedTopic?: string;
+  videos?: ProcessMaterialVideoDTO[];
+  learningPlan?: string;
+  savedToDatabase?: boolean;
+  savedVideoIds?: number[];
+  savedCount?: number;
+  saveError?: string;
+  saveReason?: string;
+  processing?: {
+    totalTimeMs: number;
+    totalTimeFormatted: string;
+    step1_topicMs?: number;
+    step2_searchMs?: number;
+    step3_processMs?: number;
+    step4_planMs?: number;
+  };
+  videoStats?: {
+    target: number;
+    successful: number;
+    candidatesFound: number;
+  };
+  error?: string; // when status === error
+  suggestion?: string; // when status === error
+}
+

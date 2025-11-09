@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,17 +15,37 @@ export function Flashcards() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [completedCards, setCompletedCards] = useState<Set<number>>(new Set());
   const [cards, setCards] = useState<FlashcardDTO[]>([]);
+  const isStudyVideo = useMemo(() => !!id && id.startsWith('api-video-'), [id]);
 
   useEffect(() => {
     if (!id) {
       setCards(mockFlashcards);
       return;
     }
-    endpoints.lessons
-      .flashcards(id)
-      .then(setCards)
-      .catch(() => setCards(mockFlashcards));
-  }, [id]);
+    if (isStudyVideo) {
+      const numericId = Number(id.replace('api-video-', ''));
+      if (Number.isNaN(numericId)) {
+        setCards(mockFlashcards);
+        return;
+      }
+      endpoints.studyMaterials
+        .videoFlashcards(numericId)
+        .then(res => {
+          const mapped: FlashcardDTO[] = (res.flashcards || []).map(fc => ({
+            id: String(fc.id),
+            front: fc.front,
+            back: fc.back,
+          }));
+          setCards(mapped.length > 0 ? mapped : mockFlashcards);
+        })
+        .catch(() => setCards(mockFlashcards));
+    } else {
+      endpoints.lessons
+        .flashcards(id)
+        .then(setCards)
+        .catch(() => setCards(mockFlashcards));
+    }
+  }, [id, isStudyVideo]);
 
   const total = cards.length || mockFlashcards.length;
   const currentCard = (cards[currentIndex] || mockFlashcards[currentIndex]);

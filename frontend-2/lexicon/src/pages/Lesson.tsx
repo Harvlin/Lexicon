@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -20,21 +20,77 @@ import { Flashcards } from "@/components/lesson/Flashcards";
 import { Quiz } from "@/components/lesson/Quiz";
 import { mockLessons } from "@/lib/mockData";
 import { endpoints } from "@/lib/api";
-import type { LessonDTO } from "@/lib/types";
+import type { LessonDTO, StudyVideoDetailResponseDTO } from "@/lib/types";
 import { toast } from "sonner";
 
 export default function Lesson() {
   const { id } = useParams();
   const [lesson, setLesson] = useState<LessonDTO | null>(null);
+  const [videoDetail, setVideoDetail] = useState<StudyVideoDetailResponseDTO | null>(null);
+  const isStudyVideo = useMemo(() => !!id && id.startsWith('api-video-'), [id]);
   const [activeTab, setActiveTab] = useState("content");
 
   useEffect(() => {
     if (!id) return;
-    endpoints.lessons
-      .get(id)
-      .then(setLesson)
-      .catch(() => setLesson(mockLessons.find((l) => l.id === id) || null));
-  }, [id]);
+    // Branch: mapped study-material video vs regular lesson
+    if (isStudyVideo) {
+      const numericId = Number(id.replace('api-video-', ''));
+      if (Number.isNaN(numericId)) return;
+      endpoints.studyMaterials.video(numericId)
+        .then(detail => {
+          setVideoDetail(detail);
+          // Map StudyVideoDetailDTO → LessonDTO for UI reuse
+          const v = detail.video;
+          const toEmbedUrl = (videoId?: string, url?: string): string => {
+            if (videoId && videoId.trim()) return `https://www.youtube.com/embed/${videoId.trim()}?rel=0`;
+            if (!url) return '';
+            try {
+              const u = new URL(url);
+              if (u.hostname.includes('youtube.com')) {
+                if (u.pathname.startsWith('/watch')) {
+                  const idQ = u.searchParams.get('v');
+                  if (idQ) return `https://www.youtube.com/embed/${idQ}?rel=0`;
+                }
+                if (u.pathname.startsWith('/shorts/')) {
+                  const idS = u.pathname.split('/')[2];
+                  if (idS) return `https://www.youtube.com/embed/${idS}?rel=0`;
+                }
+                if (u.pathname.startsWith('/embed/')) return url;
+              }
+              if (u.hostname === 'youtu.be') {
+                const idB = u.pathname.replace('/', '');
+                if (idB) return `https://www.youtube.com/embed/${idB}?rel=0`;
+              }
+            } catch {}
+            return url;
+          };
+          const mapped: LessonDTO = {
+            id: id,
+            title: v.title,
+            description: v.summary?.content || v.topic || v.channelTitle || 'Video lesson',
+            category: v.topic || 'Video',
+            difficulty: 'beginner', // Heuristic; could refine later
+            duration: 60,
+            progress: 0,
+            thumbnail: '',
+            type: 'video',
+            tags: [v.channelTitle, v.topic].filter(Boolean) as string[],
+            isFavorite: false,
+            videoUrl: toEmbedUrl(v.videoId, v.videoUrl),
+          };
+          setLesson(mapped);
+        })
+        .catch(() => {
+          // Fallback to mock if something fails
+          setLesson(mockLessons.find((l) => l.id === id) || null);
+        });
+    } else {
+      endpoints.lessons
+        .get(id)
+        .then(setLesson)
+        .catch(() => setLesson(mockLessons.find((l) => l.id === id) || null));
+    }
+  }, [id, isStudyVideo]);
 
   if (!lesson) {
     return (
@@ -49,6 +105,13 @@ export default function Lesson() {
 
   const handleCompleteLesson = () => {
     if (!lesson) return;
+    // Only attempt completion API for regular lessons (not mapped study-material videos)
+    if (isStudyVideo) {
+      // Optimistic local completion only
+      setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
+      toast.success("Marked video as completed locally.");
+      return;
+    }
     const prev = lesson;
     setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
     endpoints.lessons
@@ -78,10 +141,6 @@ export default function Lesson() {
             <div className="flex items-center gap-2 mb-2">
               <Badge>{lesson.category}</Badge>
               <Badge variant="outline">{lesson.difficulty}</Badge>
-              <Badge variant="outline" className="gap-1">
-                <Clock className="h-3 w-3" />
-                {lesson.duration}m
-              </Badge>
             </div>
             <h1 className="text-4xl font-heading font-bold mb-3">
               {lesson.title}
@@ -159,52 +218,43 @@ export default function Lesson() {
           
           <Card>
             <CardContent className="p-8 prose prose-slate max-w-none">
-              <h2 className="font-heading">Introduction</h2>
-              <p>
-                Welcome to this comprehensive lesson on {lesson.title}. In this lesson,
-                you'll gain a deep understanding of the key concepts and practical
-                applications.
-              </p>
-
-              <h3 className="font-heading">Learning Objectives</h3>
-              <ul>
-                <li>Understand the fundamental concepts and terminology</li>
-                <li>Learn practical applications and real-world examples</li>
-                <li>Develop hands-on skills through interactive exercises</li>
-                <li>Apply knowledge to solve common challenges</li>
-              </ul>
-
-              <h3 className="font-heading">Key Concepts</h3>
-              <p>
-                This section introduces the core ideas and principles. Machine learning,
-                for instance, represents a paradigm shift in how we approach problem-solving
-                with computers. Instead of explicitly programming every rule, we teach
-                systems to learn patterns from data.
-              </p>
-
-              <div className="bg-primary/5 border-l-4 border-primary p-4 my-6">
-                <p className="font-semibold text-primary mb-2">💡 Pro Tip</p>
-                <p className="text-sm m-0">
-                  Use the AI Chat tab to ask questions about any concept you find
-                  challenging. The AI assistant is here to help clarify and provide
-                  additional examples!
-                </p>
-              </div>
-
-              <h3 className="font-heading">Practical Application</h3>
-              <p>
-                Let's explore how these concepts apply in real-world scenarios. Understanding
-                the theory is important, but seeing how it works in practice solidifies
-                your knowledge and helps you retain information better.
-              </p>
-
-              <h3 className="font-heading">Common Pitfalls</h3>
-              <ul>
-                <li>Rushing through concepts without practicing</li>
-                <li>Not asking questions when confused</li>
-                <li>Skipping the interactive exercises and quizzes</li>
-              </ul>
-
+              {isStudyVideo && videoDetail?.video.summary?.content ? (
+                <>
+                  <h2 className="font-heading">AI-Generated Summary</h2>
+                  <p className="whitespace-pre-line">
+                    {videoDetail.video.summary.content}
+                  </p>
+                  <div className="bg-primary/5 border-l-4 border-primary p-4 my-6">
+                    <p className="font-semibold text-primary mb-2">🔍 Context</p>
+                    <p className="text-sm m-0">
+                      This summary was generated from the processed transcript of the selected video.
+                      Use Flashcards & Quiz tabs to reinforce retention.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="font-heading">Introduction</h2>
+                  <p>
+                    Welcome to this comprehensive lesson on {lesson.title}. In this lesson,
+                    you'll gain a deep understanding of the key concepts and practical
+                    applications.
+                  </p>
+                  <h3 className="font-heading">Learning Objectives</h3>
+                  <ul>
+                    <li>Understand the fundamental concepts and terminology</li>
+                    <li>Learn practical applications and real-world examples</li>
+                    <li>Develop hands-on skills through interactive exercises</li>
+                    <li>Apply knowledge to solve common challenges</li>
+                  </ul>
+                  <h3 className="font-heading">Common Pitfalls</h3>
+                  <ul>
+                    <li>Rushing through concepts without practicing</li>
+                    <li>Not asking questions when confused</li>
+                    <li>Skipping the interactive exercises and quizzes</li>
+                  </ul>
+                </>
+              )}
               <div className="flex gap-4 mt-8 not-prose">
                 <Button
                   onClick={() => setActiveTab("flashcards")}
@@ -233,7 +283,7 @@ export default function Lesson() {
               <div className="mb-6">
                 <h2 className="text-2xl font-heading font-bold mb-2">Flashcards</h2>
                 <p className="text-muted-foreground">
-                  Review key concepts with interactive flashcards. Click to flip!
+                  {isStudyVideo ? 'These flashcards are generated from the processed video.' : 'Review key concepts with interactive flashcards. Click to flip!'}
                 </p>
               </div>
               <Flashcards />
@@ -247,7 +297,7 @@ export default function Lesson() {
               <div className="mb-6">
                 <h2 className="text-2xl font-heading font-bold mb-2">Knowledge Check</h2>
                 <p className="text-muted-foreground">
-                  Test your understanding with this quiz. Choose the best answer for each question.
+                  {isStudyVideo ? 'Questions derived from AI processing of the video transcript.' : 'Test your understanding with this quiz. Choose the best answer for each question.'}
                 </p>
               </div>
               <Quiz />

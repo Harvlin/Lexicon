@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSchedule } from '@/hooks/useSchedule';
 import { mockLessons } from '@/lib/mockData';
+import type { LessonDTO } from '@/lib/types';
+import { endpoints } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -9,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
-import { ChevronLeft, ChevronRight, RefreshCcw, Plus, CheckCircle2, Clock, Loader2, Trash2, CalendarDays, Settings, SplitSquareHorizontal, TrendingUp, Target, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCcw, Plus, CheckCircle2, Clock, Loader2, Trash2, CalendarDays, Settings, TrendingUp, Target, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
 function formatWeekLabel(weekId: string) {
@@ -23,8 +26,119 @@ function minutesToHhMm(m: number) {
 function toISODate(d: Date) { return d.toISOString().substring(0,10); }
 
 export default function SchedulePage() {
+  const { user } = useAuth();
   // @ts-ignore source is an extra field for UI
-  const { weekId, sessions, stats, addSession, deleteSession, setStatus, regenerateCurrentWeek, shiftWeek, splitWeekSessions, splitDaySessions, source } = useSchedule();
+  const { weekId, sessions, stats, addSession, deleteSession, setStatus, regenerateCurrentWeek, shiftWeek, source } = useSchedule();
+
+  // Fetch real lessons from backend
+  const [realLessons, setRealLessons] = useState<LessonDTO[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(false);
+  const [lessonsFetched, setLessonsFetched] = useState(false);
+
+  useEffect(() => {
+    // Only fetch lessons if user is authenticated
+    if (!user) {
+      console.log('🔒 User not authenticated, using mock lessons');
+      return;
+    }
+    
+    if (lessonsFetched) return;
+    
+    setLessonsLoading(true);
+    console.log('🔄 Fetching videos (lessons) from backend...');
+    
+    // Fetch real videos from study-materials endpoint
+    fetch('http://localhost:8080/api/study-materials/videos', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('lexigrain:authToken')}`,
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(response => {
+        console.log('📥 Backend response:', response);
+        
+        if (response.videos && response.videos.length > 0) {
+          // Transform videos to LessonDTO format
+          const lessons = response.videos.map((video: any) => ({
+            id: String(video.id),
+            title: video.title,
+            description: `${video.channelTitle} - ${video.topic}`,
+            category: video.topic,
+            difficulty: 'beginner',
+            duration: 30, // Default duration
+            progress: 0,
+            thumbnail: '🎥',
+            type: 'video',
+            tags: [video.topic],
+            isFavorite: false,
+            videoUrl: video.videoUrl,
+          }));
+          
+          console.log(`✅ Fetched ${lessons.length} videos from backend`);
+          setRealLessons(lessons);
+          try {
+            localStorage.setItem('lexigrain:lessons:cache', JSON.stringify(lessons));
+          } catch {}
+        } else {
+          console.warn('⚠️  Backend returned empty videos list, using mock data');
+        }
+      })
+      .catch(err => {
+        console.warn('⚠️  Could not fetch videos from backend, using mock data');
+        console.warn('   Reason:', err.message);
+        
+        // Try loading from cache first
+        try {
+          const cached = localStorage.getItem('lexigrain:lessons:cache');
+          if (cached) {
+            const cachedLessons = JSON.parse(cached);
+            if (cachedLessons.length > 0) {
+              setRealLessons(cachedLessons);
+              console.log(`📦 Loaded ${cachedLessons.length} lessons from cache`);
+              return;
+            }
+          }
+        } catch {}
+        
+        // Ultimate fallback: use mock lessons (will be used via availableLessons)
+        console.log('📝 Using mock lessons as fallback');
+      })
+      .finally(() => {
+        setLessonsLoading(false);
+        setLessonsFetched(true);
+      });
+  }, [user, lessonsFetched]);
+
+  // Helper to extract lesson number from "lesson-X" format
+  const extractLessonNumber = (id: string): string => {
+    if (id.startsWith('lesson-')) return id.substring(7);
+    return id;
+  };
+
+  // Combine real lessons with mock fallback
+  const availableLessons = useMemo(() => {
+    if (realLessons.length > 0) return realLessons;
+    return mockLessons;
+  }, [realLessons]);
+
+  // Create lesson lookup by both formats (ID and "lesson-ID")
+  const lessonsById = useMemo(() => {
+    const map: Record<string, LessonDTO> = {};
+    availableLessons.forEach(l => {
+      map[l.id] = l;
+      map[`lesson-${l.id}`] = l;
+      // Also support numeric extraction
+      const num = extractLessonNumber(l.id);
+      if (num !== l.id) {
+        map[num] = l;
+      }
+    });
+    return map;
+  }, [availableLessons]);
 
   // Calendar + day focus
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -75,8 +189,6 @@ export default function SchedulePage() {
       try { localStorage.setItem('lexigrain:onboarding', JSON.stringify(next)); } catch {}
     } catch {}
   };
-
-  const lessonsById = useMemo(() => Object.fromEntries(mockLessons.map(l => [l.id, l])), []);
 
   const daySessions = useMemo(() => sessions.filter(s => s.date === selectedISO).sort((a,b) => a.createdAt.localeCompare(b.createdAt)), [sessions, selectedISO]);
 
@@ -132,9 +244,13 @@ export default function SchedulePage() {
                     <CalendarDays className="h-7 w-7" />
                   </div>
                   <h1 className="text-4xl font-heading font-bold tracking-tight">Your Schedule</h1>
-                  {source === 'mock' && (
+                  {realLessons.length > 0 ? (
+                    <span className="inline-flex items-center rounded-full bg-green-400/90 text-green-900 px-3 py-1 text-xs font-bold tracking-wide uppercase shadow-lg">
+                      {realLessons.length} Lessons Synced
+                    </span>
+                  ) : (
                     <span className="inline-flex items-center rounded-full bg-yellow-400/90 text-yellow-900 px-3 py-1 text-xs font-bold tracking-wide uppercase shadow-lg">
-                      Demo Mode
+                      Mock Data
                     </span>
                   )}
                 </div>
@@ -175,9 +291,20 @@ export default function SchedulePage() {
                         <Select value={lessonId} onValueChange={v => setLessonId(v)}>
                           <SelectTrigger className="h-11"><SelectValue placeholder="Choose a lesson" /></SelectTrigger>
                           <SelectContent className="max-h-72">
-                            {mockLessons.map(l => (
-                              <SelectItem value={l.id} key={l.id}>{l.title}</SelectItem>
-                            ))}
+                            {lessonsLoading ? (
+                              <div className="p-4 text-center text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                                Loading lessons...
+                              </div>
+                            ) : availableLessons.length === 0 ? (
+                              <div className="p-4 text-center text-sm text-muted-foreground">
+                                No lessons available
+                              </div>
+                            ) : (
+                              availableLessons.map(l => (
+                                <SelectItem value={l.id} key={l.id}>{l.title}</SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -199,12 +326,9 @@ export default function SchedulePage() {
                 <Button variant="default" onClick={() => { savePreferences(); regenerateCurrentWeek(); }} className="gap-2 shadow-lg order-2">
                   <RefreshCcw className="h-4 w-4"/> Regenerate
                 </Button>
-                <Button variant="secondary" onClick={() => splitWeekSessions()} className="gap-2 shadow-lg order-3">
-                  <SplitSquareHorizontal className="h-4 w-4"/> Split
-                </Button>
                 <Dialog open={openPrefs} onOpenChange={setOpenPrefs}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="gap-2 shadow-lg order-4">
+                    <Button variant="outline" className="gap-2 shadow-lg order-3">
                       <Settings className="h-4 w-4"/> Settings
                     </Button>
                   </DialogTrigger>
@@ -317,10 +441,11 @@ export default function SchedulePage() {
                 onSelect={(d) => d && setSelectedDate(d)}
                 modifiers={{
                   hasSessions: (date) => hasSessionsDates.has(toISODate(date)),
+                  completed: (date) => completedDates.has(toISODate(date)),
                 }}
                 modifiersClassNames={{
-                  // Subtle dot marker below the date for days with sessions
-                  hasSessions: "relative after:content-[''] after:block after:h-1 after:w-1 after:rounded-full after:bg-primary after:mx-auto after:mt-1",
+                  hasSessions: "font-semibold relative after:content-[''] after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary/60",
+                  completed: "font-semibold relative after:content-[''] after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-success",
                 }}
                 className="rounded-lg"
               />
@@ -352,10 +477,6 @@ export default function SchedulePage() {
                       <div className="flex-1 space-y-2">
                         <div className="font-semibold leading-snug line-clamp-2 text-base">{lesson?.title || 'Lesson'}</div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {minutesToHhMm(s.plannedMinutes)}
-                          </span>
                           <Badge variant={s.status === 'done' ? 'default' : 'secondary'} className="text-[10px] font-medium">
                             {s.status}
                           </Badge>
@@ -394,11 +515,6 @@ export default function SchedulePage() {
                   <p className="text-sm text-muted-foreground">No sessions scheduled for this day.</p>
                 </div>
               )}
-              <div className="flex justify-end pt-2">
-                <Button variant="outline" className="gap-2 text-xs" onClick={() => splitDaySessions(selectedISO)}>
-                  <SplitSquareHorizontal className="h-3 w-3"/> Split Long Sessions
-                </Button>
-              </div>
             </CardContent>
           </Card>
 
@@ -469,8 +585,6 @@ export default function SchedulePage() {
                       </div>
                       <div className="text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                         <span>{new Date(s.date).toLocaleDateString(undefined,{ month:'short', day:'numeric'})}</span>
-                        <span>•</span>
-                        <span>{minutesToHhMm(s.plannedMinutes)}</span>
                         <span>•</span>
                         <Badge variant={s.status === 'done' ? 'default' : 'secondary'} className="text-[9px] h-4 px-1.5">
                           {s.status}

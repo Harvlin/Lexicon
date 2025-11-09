@@ -41,10 +41,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
   });
   if (!res.ok) {
-    // On 401/403, clear token so app can recover gracefully
-    if (res.status === 401 || res.status === 403) {
-      try { clearAuthToken(); } catch {}
-    }
+    // Do NOT blindly clear token on any 401/403, because some endpoints may be
+    // unavailable/not yet implemented and secured by the backend, which would
+    // accidentally log users out. Token lifecycle is managed by auth flows.
+    // We only surface the error here; callers can decide how to react.
     const text = await res.text().catch(() => "");
     throw new Error(`API ${options.method || "GET"} ${path} failed: ${res.status} ${text}`);
   }
@@ -86,7 +86,29 @@ export async function fetchWithFallback<T>(
 }
 
 // Convenience typed endpoints (expand as we wire pages)
-import type { UserDTO, UserProgressSummaryDTO, LessonDTO, ApiList, QuizQuestionDTO, FlashcardDTO, QuizAnswerDTO, QuizSubmissionResultDTO, OnboardingDTO, ScheduleWeekDTO, ScheduleSessionDTO, ChatRequestDTO, ChatMessageDTO, NotificationPrefsDTO, AuthResponseDTO, MessageResponseDTO } from "./types";
+import type {
+  UserDTO,
+  UserProgressSummaryDTO,
+  LessonDTO,
+  ApiList,
+  QuizQuestionDTO,
+  FlashcardDTO,
+  QuizAnswerDTO,
+  QuizSubmissionResultDTO,
+  OnboardingDTO,
+  ScheduleWeekDTO,
+  ScheduleSessionDTO,
+  ChatRequestDTO,
+  ChatMessageDTO,
+  NotificationPrefsDTO,
+  AuthResponseDTO,
+  MessageResponseDTO,
+  StudyVideosResponseDTO,
+  StudyVideoDetailResponseDTO,
+  StudyVideoQuestionDTO,
+  StudyFlashcardDTO,
+  ProcessResponseDTO
+} from "./types";
 
 export const endpoints = {
   auth: {
@@ -151,5 +173,17 @@ export const endpoints = {
     updateNotifications: (prefs: NotificationPrefsDTO) => api.put<NotificationPrefsDTO>(`/me/notifications`, prefs),
     // Backend implements change password under /auth
     changePassword: (payload: { currentPassword: string; newPassword: string }) => api.post<void>(`/auth/change-password`, payload),
+  },
+  studyMaterials: {
+    videos: () => api.get<StudyVideosResponseDTO>(`/study-materials/videos`),
+    videosByTopic: (topic: string) => api.get<StudyVideosResponseDTO>(`/study-materials/videos/topic/${encodeURIComponent(topic)}`),
+    video: (videoId: number) => api.get<StudyVideoDetailResponseDTO>(`/study-materials/videos/${videoId}`),
+    videoQuestions: (videoId: number) => api.get<{ status: string; videoId: number; count: number; questions: StudyVideoQuestionDTO[] }>(`/study-materials/videos/${videoId}/questions`),
+    videoFlashcards: (videoId: number) => api.get<{ status: string; videoId: number; count: number; flashcards: StudyFlashcardDTO[] }>(`/study-materials/videos/${videoId}/flashcards`),
+    learningPlans: () => api.get<{ status: string; count: number; plans: { id: number; topic: string; userPreference: string; planContent: string; createdAt: string }[] }>(`/study-materials/learning-plans`),
+  },
+  process: {
+    preference: (preference: string) => api.get<ProcessResponseDTO>(`/process/preference?preference=${encodeURIComponent(preference)}`),
+    preview: (preference: string) => api.get<ProcessResponseDTO>(`/process/preference/preview?preference=${encodeURIComponent(preference)}`),
   }
 };

@@ -37,6 +37,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       setUser(next);
       try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(next)); } catch {}
+      // If there is a pending onboarding preference, trigger processing now that we're authenticated
+      try {
+        const pending = localStorage.getItem('lexigrain:pendingPreference');
+        if (pending) {
+          endpoints.process.preference(pending)
+            .then(res => {
+              if (res.savedToDatabase) {
+                try { localStorage.removeItem('lexigrain:pendingPreference'); } catch {}
+              }
+              if (res.videos && res.videos.length) {
+                try { localStorage.setItem('lexigrain:processedVideos', JSON.stringify(res.videos)); } catch {}
+              }
+            })
+            .catch(() => {/* ignore */});
+        }
+      } catch {/* ignore */}
     } catch {
       // If token invalid/expired, clear and reset user
       try { clearAuthToken(); } catch {}

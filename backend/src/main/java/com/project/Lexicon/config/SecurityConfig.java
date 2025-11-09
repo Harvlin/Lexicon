@@ -20,8 +20,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.client.RestTemplate;
-
 import java.util.Arrays;
 
 @Configuration
@@ -52,6 +50,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/chat/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
 
                         .requestMatchers("/api/diagnostic/**").permitAll()
+                        .requestMatchers("/api/schedule/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
+                        .requestMatchers("/api/study-materials/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
 
                         .requestMatchers("/api/youtube/**").hasAnyRole("ADMIN", "USER", "STUDENT", "PROFESSIONAL", "EDUCATOR")
                         .requestMatchers("/api/process/**").hasAnyRole("STUDENT", "PROFESSIONAL", "EDUCATOR", "ADMIN", "USER")

@@ -47,6 +47,7 @@ const DAY_OPTIONS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const STORAGE_KEY = "lexigrain:onboarding";
 import { endpoints, fetchWithFallback } from "@/lib/api";
+import type { ProcessResponseDTO } from "@/lib/types";
 import type { OnboardingDTO } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
@@ -190,12 +191,37 @@ export default function Onboarding() {
       reminderEnabled: !!state.reminderEnabled,
       completedAt: new Date().toISOString(),
     };
+    let processCalled = false;
     try {
       await endpoints.onboarding.save(payload as OnboardingDTO);
-      // Keep a local copy to support components relying on local preferences
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
+      // Build preference string for process endpoint (concise + goals + skills)
+      const preferenceText = [
+        ...payload.goals,
+        ...payload.skills,
+        `${payload.dailyHours}h/day`,
+        payload.schedulePreset === 'Custom'
+          ? `Custom ${payload.daysOfWeek.join(',')} @ ${payload.specificTime}`
+          : payload.schedulePreset
+      ].filter(Boolean).join("; ");
+
+      // Save pending preference for post-login auto-processing
+      try { localStorage.setItem('lexigrain:pendingPreference', preferenceText); } catch {}
+      try {
+        const processResult: ProcessResponseDTO = await endpoints.process.preference(preferenceText);
+        processCalled = true;
+        // Persist lightweight reference of processed videos for quick library rendering before auth refresh
+        if (processResult.videos && processResult.videos.length) {
+          try { localStorage.setItem('lexigrain:processedVideos', JSON.stringify(processResult.videos)); } catch {}
+        }
+        if (processResult.savedToDatabase) {
+          try { localStorage.removeItem('lexigrain:pendingPreference'); } catch {}
+        }
+      } catch (e: any) {
+        // Silent fallback (user might not be authenticated yet)
+        console.warn('Process endpoint failed:', e?.message || e);
+      }
     } catch {
-      // fallback to local storage
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
       toast({
         title: "Saved locally",
@@ -203,8 +229,7 @@ export default function Onboarding() {
       });
     }
     setSaving(false);
-    // Desired flow: go to Sign In after onboarding
-    navigate("/auth/signin", { replace: true, state: { fromOnboarding: true } });
+    navigate("/auth/signin", { replace: true, state: { fromOnboarding: true, processTriggered: processCalled } });
   };
 
   // Completion guards for stepper navigation

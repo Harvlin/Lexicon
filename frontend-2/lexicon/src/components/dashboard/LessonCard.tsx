@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Clock, TrendingUp, Star, Check } from "lucide-react";
+import { Star, Check } from "lucide-react";
 import { LessonTypeIcon } from "@/lib/iconMaps";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -92,11 +92,6 @@ export function LessonCard({ lesson, onToggleFavorite }: LessonCardProps) {
 
       <CardFooter className="px-5 pb-5 pt-0 flex items-center justify-between">
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {lesson.duration}m
-          </span>
-          <span className="text-muted-foreground/50">•</span>
           <span>{lesson.category}</span>
         </div>
 

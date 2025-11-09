@@ -14,6 +14,8 @@ import { LessonCard } from "@/components/dashboard/LessonCard";
 import { mockLessons, categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { endpoints } from "@/lib/api";
+import type { StudyVideoDTO } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 import type { LessonDTO } from "@/lib/types";
 import { useServerFirst } from "@/hooks/useServerFirst";
 
@@ -21,19 +23,20 @@ type SortOption = "recommended" | "newest" | "popular" | "duration";
 type DifficultyFilter = "all" | "beginner" | "intermediate" | "advanced";
 
 export default function Library() {
-  // Lessons: show mock immediately, then auto-upgrade to API when ready
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState<SortOption>("recommended");
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("all");
+  
   // Categories: show fallback immediately, then auto-upgrade to API
   const { data: categoryList } = useServerFirst<string[]>(
     categories,
-    () => endpoints.categories.list(),
+    () => endpoints.categories.list().catch(() => categories),
     []
   );
 
-  const { data: lessons, source: lessonsSource } = useServerFirst<LessonDTO[]>(
+  const { data: lessons } = useServerFirst<LessonDTO[]>(
     mockLessons,
     () => {
       const q: Record<string, string | number | boolean | undefined> = {
@@ -44,28 +47,127 @@ export default function Library() {
         page: 1,
         limit: 30,
       };
-      return endpoints.lessons.list(q).then(res => res.items);
+      return endpoints.lessons.list(q)
+        .then(res => res.items)
+        .catch(() => mockLessons);
     },
     [searchQuery, selectedCategory, difficultyFilter, sortBy]
   );
 
-  // Maintain a local view that we can update optimistically, and resync when server data changes
-  const [lessonsView, setLessonsView] = useState<LessonDTO[]>(lessons);
-  useEffect(() => setLessonsView(lessons), [lessons]);
+  // Study Materials Videos Integration
+  const [videos, setVideos] = useState<StudyVideoDTO[] | null>(null);
+  const [videosError, setVideosError] = useState<string | null>(null);
+  const [videosLoading, setVideosLoading] = useState<boolean>(false);
 
-  const handleToggleFavorite = (id: string) => {
-    // Optimistic toggle then confirm via API
-    const prev = lessonsView;
-    const next = lessonsView.map(l => l.id === id ? { ...l, isFavorite: !l.isFavorite } : l);
-    setLessonsView(next);
-    endpoints.lessons.toggleFavorite(id).catch(() => {
-      // Revert on failure
-      setLessonsView(prev);
-    });
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setVideos(null);
+      setVideosError(null);
+      setVideosLoading(false);
+      return;
+    }
+    setVideosLoading(true);
+    endpoints.studyMaterials.videos()
+      .then(res => {
+        if (cancelled) return;
+        setVideos(res.videos);
+        setVideosError(null);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setVideosError(err.message || 'Failed to load personalized videos');
+      })
+      .finally(() => !cancelled && setVideosLoading(false));
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Helper functions for video mapping
+  const toEmbedUrl = (videoId?: string, url?: string): string => {
+    if (videoId && videoId.trim()) {
+      return `https://www.youtube.com/embed/${videoId.trim()}?rel=0`;
+    }
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('youtube.com')) {
+        if (u.pathname.startsWith('/watch')) {
+          const id = u.searchParams.get('v');
+          if (id) return `https://www.youtube.com/embed/${id}?rel=0`;
+        }
+        if (u.pathname.startsWith('/shorts/')) {
+          const id = u.pathname.split('/')[2];
+          if (id) return `https://www.youtube.com/embed/${id}?rel=0`;
+        }
+        if (u.pathname.startsWith('/embed/')) return url;
+      }
+      if (u.hostname === 'youtu.be') {
+        const id = u.pathname.replace('/', '');
+        if (id) return `https://www.youtube.com/embed/${id}?rel=0`;
+      }
+    } catch {}
+    return url;
   };
 
+  const mapDifficulty = (title: string): DifficultyFilter => {
+    const t = title.toLowerCase();
+    if (t.includes('advanced')) return 'advanced';
+    if (t.includes('intermediate')) return 'intermediate';
+    if (t.includes('beginner') || t.includes('basics') || t.includes('for beginners')) return 'beginner';
+    return 'beginner';
+  };
+
+  // Derive display data: prefer API videos when available, otherwise use lessons
+  const lessonsView = useMemo(() => {
+    if (videos && videos.length > 0) {
+      return videos.map(v => ({
+        id: `api-video-${v.id}`,
+        title: v.title,
+        description: v.channelTitle || v.topic || 'Video lesson',
+        category: v.topic || 'Video',
+        difficulty: mapDifficulty(v.title) as any,
+        duration: 60,
+        progress: 0,
+        thumbnail: '',
+        type: 'video' as const,
+        tags: [v.channelTitle, v.topic].filter(Boolean) as string[],
+        isFavorite: false,
+        videoUrl: toEmbedUrl(v.videoId, v.videoUrl),
+      }));
+    }
+    return lessons;
+  }, [videos, lessons]);
+
+  // Track favorite state separately for optimistic updates
+  const [favoriteOverrides, setFavoriteOverrides] = useState<Record<string, boolean>>({});
+
+  const handleToggleFavorite = (id: string) => {
+    const currentState = favoriteOverrides[id] ?? lessonsView.find(l => l.id === id)?.isFavorite ?? false;
+    setFavoriteOverrides(prev => ({ ...prev, [id]: !currentState }));
+    
+    if (!id.startsWith('api-video-')) {
+      endpoints.lessons.toggleFavorite(id).catch(() => {
+        // Revert on failure
+        setFavoriteOverrides(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      });
+    }
+  };
+
+  // Apply favorite overrides to lessons
+  const lessonsWithFavorites = useMemo(() => 
+    lessonsView.map(l => ({
+      ...l,
+      isFavorite: favoriteOverrides[l.id] ?? l.isFavorite
+    })),
+    [lessonsView, favoriteOverrides]
+  );
+
   // Filter lessons
-  const filteredLessons = useMemo(() => lessonsView.filter((lesson) => {
+  const filteredLessons = useMemo(() => lessonsWithFavorites.filter((lesson) => {
     const matchesSearch =
       lesson.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       lesson.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -80,7 +182,7 @@ export default function Library() {
       difficultyFilter === "all" || lesson.difficulty === difficultyFilter;
 
     return matchesSearch && matchesCategory && matchesDifficulty;
-  }), [lessons, searchQuery, selectedCategory, difficultyFilter]);
+  }), [lessonsWithFavorites, searchQuery, selectedCategory, difficultyFilter]);
 
   // Sort lessons
   const sortedLessons = useMemo(() => [...filteredLessons].sort((a, b) => {
@@ -175,8 +277,8 @@ export default function Library() {
           Showing {sortedLessons.length} {sortedLessons.length === 1 ? "lesson" : "lessons"}
           {searchQuery && ` for "${searchQuery}"`}
         </p>
-        {lessonsSource === 'api' && (
-          <span className="text-xs text-emerald-600 dark:text-emerald-400">Updated with live results</span>
+        {videos && videos.length > 0 && (
+          <span className="text-xs text-emerald-600 dark:text-emerald-400">Showing personalized videos</span>
         )}
         {(searchQuery || selectedCategory !== "All" || difficultyFilter !== "all") && (
           <Button
@@ -192,6 +294,8 @@ export default function Library() {
           </Button>
         )}
       </div>
+
+      {/* API videos replace the lessons grid content; no separate section */}
 
       {/* Lessons Grid */}
       {sortedLessons.length > 0 ? (

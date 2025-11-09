@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,17 +25,61 @@ export function Quiz() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestionDTO[]>([]);
   const [serverResult, setServerResult] = useState<QuizSubmissionResultDTO | null>(null);
+  const isStudyVideo = useMemo(() => !!id && id.startsWith('api-video-'), [id]);
 
   useEffect(() => {
     if (!id) {
       setQuestions(mockQuizQuestions);
       return;
     }
-    endpoints.lessons
-      .quiz(id)
-      .then(setQuestions)
-      .catch(() => setQuestions(mockQuizQuestions));
-  }, [id]);
+    if (isStudyVideo) {
+      const numericId = Number(id.replace('api-video-', ''));
+      if (Number.isNaN(numericId)) {
+        setQuestions(mockQuizQuestions);
+        return;
+      }
+      endpoints.studyMaterials
+        .videoQuestions(numericId)
+        .then(res => {
+          const poolAnswers = res.questions?.map(q => q.answer).filter(Boolean) || [];
+          const mapToMC = (answer: string, idx: number): QuizQuestionDTO => {
+            // Build distractors from other answers in the pool
+            const others = poolAnswers.filter((a, i) => i !== idx);
+            const distractors: string[] = [];
+            for (const a of others) {
+              if (distractors.length >= 3) break;
+              if (!distractors.includes(a) && a.trim().length > 0) distractors.push(a);
+            }
+            // If not enough distractors, create simple variations
+            while (distractors.length < 3) {
+              const fragment = answer.split(' ').slice(0, Math.max(2, Math.min(5, Math.floor(answer.split(' ').length / 2)))).join(' ');
+              const variant = fragment ? `${fragment} ...` : 'N/A';
+              if (!distractors.includes(variant)) distractors.push(variant);
+              else break;
+            }
+            const options = [answer, ...distractors].slice(0, Math.max(2, Math.min(4, 1 + distractors.length)));
+            // Shuffle options
+            const shuffled = [...options].sort(() => Math.random() - 0.5);
+            const correctIndex = shuffled.findIndex(o => o === answer);
+            return {
+              id: `${numericId}-q-${idx + 1}`,
+              question: res.questions?.[idx]?.question || `Question ${idx + 1}`,
+              options: shuffled,
+              correctAnswer: correctIndex >= 0 ? correctIndex : 0,
+              explanation: answer,
+            };
+          };
+          const mapped = (res.questions || []).map((q, i) => mapToMC(q.answer, i));
+          setQuestions(mapped.length > 0 ? mapped : mockQuizQuestions);
+        })
+        .catch(() => setQuestions(mockQuizQuestions));
+    } else {
+      endpoints.lessons
+        .quiz(id)
+        .then(setQuestions)
+        .catch(() => setQuestions(mockQuizQuestions));
+    }
+  }, [id, isStudyVideo]);
 
   const question = questions[currentQuestion] || mockQuizQuestions[currentQuestion];
   const total = questions.length || mockQuizQuestions.length;
@@ -77,8 +121,8 @@ export function Quiz() {
       setSelectedOption(null);
       setShowExplanation(false);
     } else {
-      // Submit to backend for final scoring
-      if (id) {
+      // Submit to backend for final scoring when available; otherwise compute locally
+      if (id && !isStudyVideo) {
         const payload: QuizAnswerDTO[] = answers.map(a => ({ questionId: a.questionId, selectedOption: a.selectedOption }));
         endpoints.lessons
           .submitQuiz(id, payload)
