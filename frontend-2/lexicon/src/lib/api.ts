@@ -131,6 +131,18 @@ export const endpoints = {
   },
   progress: {
     summary: () => api.get<UserProgressSummaryDTO>(`/progress/summary`),
+    weeklyActivity: () => api.get<{ day: string; date: string; lessons: number; points: number; minutes: number }[]>(`/progress/activity/weekly`),
+    timeStats: () => api.get<{ totalTime: number; thisWeek: number; thisMonth: number; avgDaily: number }>(`/progress/time-stats`),
+    migrateLocal: (completedVideos: Record<string, { completedAt: string; title?: string; duration?: number }>) => 
+      api.post<{ status: string; migrated: number; errors: string[]; message: string }>(`/progress/migrate-local`, { completedVideos }),
+  },
+  dashboard: {
+    recentActivity: (days?: number, limit?: number) => {
+      const qs = new URLSearchParams();
+      if (days) qs.set('days', String(days));
+      if (limit) qs.set('limit', String(limit));
+      return api.get<{ status: string; count: number; activities: any[]; since: string }>(`/dashboard/recent-activity${qs.toString() ? '?' + qs.toString() : ''}`);
+    },
   },
   lessons: {
     list: (query?: Record<string, string | number | boolean | undefined>) => {
@@ -145,10 +157,12 @@ export const endpoints = {
       return api.get<ApiList<LessonDTO>>(`/lessons${qs}`);
     },
     get: (id: string) => api.get<LessonDTO>(`/lessons/${id}`),
-    toggleFavorite: (id: string) => api.post<void>(`/lessons/${id}/favorite`),
+    complete: (id: string, body?: { actualMinutes?: number }) => 
+      api.post<{ status: string; lessonId: string; completedAt: string; message: string }>(`/lessons/${id}/complete`, body),
+    toggleFavorite: (id: string) => api.post<{ status: string; lessonId: string; isFavorite: boolean }>(`/lessons/${id}/favorite`),
+    favorited: () => api.get<ApiList<LessonDTO>>(`/lessons/favorited`),
     quiz: (id: string) => api.get<QuizQuestionDTO[]>(`/lessons/${id}/quiz`),
     flashcards: (id: string) => api.get<FlashcardDTO[]>(`/lessons/${id}/flashcards`),
-    complete: (id: string) => api.post<void>(`/lessons/${id}/complete`),
     submitQuiz: (id: string, answers: QuizAnswerDTO[]) => api.post<QuizSubmissionResultDTO>(`/lessons/${id}/quiz/submissions`, { answers }),
   },
   categories: {
@@ -179,6 +193,7 @@ export const endpoints = {
     videosByTopic: (topic: string) => api.get<StudyVideosResponseDTO>(`/study-materials/videos/topic/${encodeURIComponent(topic)}`),
     video: (videoId: number) => api.get<StudyVideoDetailResponseDTO>(`/study-materials/videos/${videoId}`),
     completeVideo: (videoId: number) => api.post<{ status: string; message: string; videoId: number; completedAt: string }>(`/study-materials/videos/${videoId}/complete`),
+    toggleFavoriteVideo: (videoId: number) => api.post<{ status: string; videoId: number; isFavorite: boolean }>(`/study-materials/videos/${videoId}/favorite`),
     videoQuestions: (videoId: number) => api.get<{ status: string; videoId: number; count: number; questions: StudyVideoQuestionDTO[] }>(`/study-materials/videos/${videoId}/questions`),
     videoFlashcards: (videoId: number) => api.get<{ status: string; videoId: number; count: number; flashcards: StudyFlashcardDTO[] }>(`/study-materials/videos/${videoId}/flashcards`),
     learningPlans: () => api.get<{ status: string; count: number; plans: { id: number; topic: string; userPreference: string; planContent: string; createdAt: string }[] }>(`/study-materials/learning-plans`),

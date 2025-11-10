@@ -1,6 +1,9 @@
 package com.project.Lexicon.controller;
 
+import com.project.Lexicon.domain.ProgressStatus;
 import com.project.Lexicon.domain.entity.*;
+import com.project.Lexicon.repository.ProgressRepository;
+import com.project.Lexicon.repository.UserFavoriteRepository;
 import com.project.Lexicon.service.StudyMaterialService;
 import com.project.Lexicon.service.UserService;
 import com.project.Lexicon.service.YoutubeService;
@@ -11,10 +14,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -28,6 +33,8 @@ public class StudyMaterialController {
     private final StudyMaterialService studyMaterialService;
     private final UserService userService;
     private final YoutubeService youtubeService;
+    private final ProgressRepository progressRepository;
+    private final UserFavoriteRepository userFavoriteRepository;
     
     // In-memory cache for video durations (persists until server restart)
     private final Map<String, Integer> durationCache = new ConcurrentHashMap<>();
@@ -133,7 +140,7 @@ public class StudyMaterialController {
 
     /**
      * Mark a video as completed
-     * Creates a schedule session with status 'done' for today if not exists
+     * Creates Progress record with special handling for video completion tracking
      */
     @PostMapping("/videos/{videoId}/complete")
     public ResponseEntity<?> completeVideo(
@@ -146,15 +153,83 @@ public class StudyMaterialController {
 
             log.info("User {} marking video {} as completed", user.getEmail(), videoId);
 
+            // Create Progress record with video ID stored as negative lesson ID
+            // This is a quick fix approach to track video completions without schema changes
+            // Video ID is stored as negative to distinguish from regular lessons
+            Long virtualLessonId = -videoId; // Negative ID indicates video
+            
+            Progress progress = progressRepository.findByUserAndLesson_Id(user, virtualLessonId)
+                    .orElse(Progress.builder()
+                            .user(user)
+                            .lesson(null) // Video completions don't link to Lesson table
+                            .progressPercent(0)
+                            .build());
+            
+            progress.setStatus(ProgressStatus.COMPLETED);
+            progress.setCompletedAt(Instant.now());
+            progress.setProgressPercent(100);
+            
+            progressRepository.save(progress);
+            
+            log.info("Video {} marked as completed for user {}", videoId, user.getEmail());
+
             return ResponseEntity.ok(Map.of(
                     "status", "success",
                     "message", "Video marked as completed",
                     "videoId", videoId,
-                    "completedAt", java.time.Instant.now().toString()
+                    "completedAt", progress.getCompletedAt().toString()
             ));
 
         } catch (Exception e) {
             log.error("Failed to mark video as complete: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Toggle favorite status for a video
+     */
+    @PostMapping("/videos/{videoId}/favorite")
+    public ResponseEntity<?> toggleFavorite(
+            @PathVariable Long videoId,
+            Authentication authentication) {
+
+        try {
+            User user = getAuthenticatedUser(authentication);
+            
+            log.info("User {} toggling favorite for video {}", user.getEmail(), videoId);
+            
+            Video video = studyMaterialService.getVideoById(videoId, user.getId());
+            
+            // Check if already favorited
+            Optional<UserFavorite> existing = userFavoriteRepository.findByUserAndVideo_Id(user, videoId);
+            
+            boolean isFavorite;
+            if (existing.isPresent()) {
+                // Remove from favorites
+                userFavoriteRepository.delete(existing.get());
+                isFavorite = false;
+                log.info("Removed video {} from favorites for user {}", videoId, user.getEmail());
+            } else {
+                // Add to favorites
+                UserFavorite favorite = UserFavorite.builder()
+                        .user(user)
+                        .video(video)
+                        .build();
+                userFavoriteRepository.save(favorite);
+                isFavorite = true;
+                log.info("Added video {} to favorites for user {}", videoId, user.getEmail());
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "videoId", videoId,
+                    "isFavorite", isFavorite
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to toggle favorite for video {}: {}", videoId, e.getMessage(), e);
             return ResponseEntity.badRequest()
                     .body(Map.of("status", "error", "message", e.getMessage()));
         }

@@ -146,7 +146,7 @@ export default function Library() {
 
   // Derive display data: prefer API videos when available, otherwise use lessons
   const lessonsView = useMemo(() => {
-    // Load completion status from localStorage
+    // Load completion status from localStorage AND backend
     const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
     
     if (videos && videos.length > 0) {
@@ -165,15 +165,15 @@ export default function Library() {
           thumbnail: '',
           type: 'video' as const,
           tags: [v.channelTitle, v.topic].filter(Boolean) as string[],
-          isFavorite: false,
+          isFavorite: false, // TODO: Backend will add isFavorite to StudyVideoDTO
           videoUrl: toEmbedUrl(v.videoId, v.videoUrl),
         };
       });
     }
     
-    // For regular lessons, also check completion status
+    // For regular lessons, backend already returns progress and isFavorite
     return lessons.map(l => {
-      const isCompleted = !!completedVideos[l.id];
+      const isCompleted = !!completedVideos[l.id] || l.progress === 100;
       return {
         ...l,
         progress: isCompleted ? 100 : l.progress
@@ -188,7 +188,21 @@ export default function Library() {
     const currentState = favoriteOverrides[id] ?? lessonsView.find(l => l.id === id)?.isFavorite ?? false;
     setFavoriteOverrides(prev => ({ ...prev, [id]: !currentState }));
     
-    if (!id.startsWith('api-video-')) {
+    if (id.startsWith('api-video-')) {
+      // Handle video favorites
+      const numericId = Number(id.replace('api-video-', ''));
+      if (!Number.isNaN(numericId)) {
+        endpoints.studyMaterials.toggleFavoriteVideo(numericId).catch(() => {
+          // Revert on failure
+          setFavoriteOverrides(prev => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        });
+      }
+    } else {
+      // Handle lesson favorites
       endpoints.lessons.toggleFavorite(id).catch(() => {
         // Revert on failure
         setFavoriteOverrides(prev => {

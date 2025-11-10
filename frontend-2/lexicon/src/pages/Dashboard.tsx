@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [videos, setVideos] = useState<StudyVideoDTO[]>([]);
   const [user, setUser] = useState<UserDTO | null>(authUser);
   const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
+  const [timeStats, setTimeStats] = useState<{ totalTime: number; thisWeek: number; thisMonth: number; avgDaily: number } | null>(null);
 
   useEffect(() => {
     // Prefer auth context user for greeting; fallback to server/me then mock
@@ -34,6 +35,12 @@ export default function Dashboard() {
       .summary()
       .then(setProgress)
       .catch(() => setProgress(mockProgress));
+
+    // Fetch time statistics
+    endpoints.progress
+      .timeStats()
+      .then(setTimeStats)
+      .catch(() => console.warn('Failed to fetch time stats'));
 
     // Fetch study-material videos if user is authenticated
     if (authUser) {
@@ -108,8 +115,10 @@ export default function Dashboard() {
     videoUrl: toEmbedUrl(v.videoId, v.videoUrl),
   }));
 
-  // Combine API videos with regular lessons
-  const allContent = [...videoLessons, ...lessons];
+  // Combine API videos with regular lessons, deduplicating by ID
+  const regularLessonIds = new Set(lessons.map(l => l.id));
+  const uniqueVideoLessons = videoLessons.filter(v => !regularLessonIds.has(v.id));
+  const allContent = [...uniqueVideoLessons, ...lessons];
 
   const continueLearning = allContent
     .filter((l) => l.progress > 0 && l.progress < 100)
@@ -214,7 +223,9 @@ export default function Dashboard() {
             <Clock className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold font-heading">24.5h</div>
+            <div className="text-3xl font-bold font-heading">
+              {timeStats ? `${(timeStats.thisMonth / 60).toFixed(1)}h` : '0h'}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               this month
             </p>

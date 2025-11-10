@@ -16,25 +16,82 @@ export default function ProgressPage() {
   const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
   const [completed, setCompleted] = useState<LessonDTO[]>([]);
   const [inProgress, setInProgress] = useState<LessonDTO[]>([]);
+  const [weeklyActivity, setWeeklyActivity] = useState<{ day: string; date: string; lessons: number; points: number; minutes: number }[]>([]);
+  const [timeStats, setTimeStats] = useState<{ totalTime: number; thisWeek: number; thisMonth: number; avgDaily: number } | null>(null);
 
   useEffect(() => {
+    // Fetch progress summary
     endpoints.progress
       .summary()
-      .then(setProgress)
-      .catch(() => setProgress(mockProgress));
+      .then((data) => {
+        console.log('✅ Progress summary loaded from API:', data);
+        setProgress(data);
+      })
+      .catch((err) => {
+        console.warn('⚠️ Failed to fetch progress summary, using mock data:', err);
+        setProgress(mockProgress);
+      });
+    
+    // Fetch weekly activity
+    endpoints.progress
+      .weeklyActivity()
+      .then((data) => {
+        console.log('✅ Weekly activity loaded from API:', data);
+        setWeeklyActivity(data);
+      })
+      .catch((err) => {
+        console.warn('⚠️ Failed to fetch weekly activity, using mock data:', err);
+        // Fallback to mock data
+        setWeeklyActivity([
+          { day: "Mon", date: "", lessons: 3, points: 150, minutes: 90 },
+          { day: "Tue", date: "", lessons: 2, points: 100, minutes: 60 },
+          { day: "Wed", date: "", lessons: 4, points: 200, minutes: 120 },
+          { day: "Thu", date: "", lessons: 1, points: 50, minutes: 30 },
+          { day: "Fri", date: "", lessons: 3, points: 150, minutes: 90 },
+          { day: "Sat", date: "", lessons: 5, points: 250, minutes: 150 },
+          { day: "Sun", date: "", lessons: 2, points: 100, minutes: 60 },
+        ]);
+      });
+    
+    // Fetch time statistics
+    endpoints.progress
+      .timeStats()
+      .then((data) => {
+        console.log('✅ Time stats loaded from API:', data);
+        setTimeStats(data);
+      })
+      .catch((err) => {
+        console.warn('⚠️ Failed to fetch time stats, using hardcoded values:', err);
+        // Fallback to null, will use hardcoded display values
+        setTimeStats(null);
+      });
+    
     // Optional: fetch completed/in-progress lessons; fallback to mock
     endpoints.lessons
       .list({ completed: true, limit: 50 })
-      .then((res) => setCompleted(res.items))
-      .catch(() => setCompleted(mockLessons.filter((l) => l.progress === 100)));
+      .then((res) => {
+        console.log('✅ Completed lessons loaded from API:', res.items.length, 'items');
+        setCompleted(res.items);
+      })
+      .catch((err) => {
+        console.warn('⚠️ Failed to fetch completed lessons, using mock data:', err);
+        setCompleted(mockLessons.filter((l) => l.progress === 100));
+      });
     endpoints.lessons
       .list({ inProgress: true, limit: 50 })
-      .then((res) => setInProgress(res.items))
-      .catch(() => setInProgress(mockLessons.filter((l) => l.progress > 0 && l.progress < 100)));
+      .then((res) => {
+        console.log('✅ In-progress lessons loaded from API:', res.items.length, 'items');
+        setInProgress(res.items);
+      })
+      .catch((err) => {
+        console.warn('⚠️ Failed to fetch in-progress lessons, using mock data:', err);
+        setInProgress(mockLessons.filter((l) => l.progress > 0 && l.progress < 100));
+      });
   }, []);
   
-  const completedLessons = completed.length ? completed : mockLessons.filter((l) => l.progress === 100);
-  const inProgressLessons = inProgress.length ? inProgress : mockLessons.filter((l) => l.progress > 0 && l.progress < 100);
+  // Use API data directly if available, otherwise use mock data
+  const completedLessons = completed.length > 0 ? completed : mockLessons.filter((l) => l.progress === 100);
+  const inProgressLessons = inProgress.length > 0 ? inProgress : mockLessons.filter((l) => l.progress > 0 && l.progress < 100);
   const summary = progress || mockProgress;
   const completionRate = useMemo(() => (summary.totalLessons ? (summary.lessonsCompleted / summary.totalLessons) * 100 : 0), [summary]);
 
@@ -46,15 +103,15 @@ export default function ProgressPage() {
     ? achievementsData
     : achievementsData.filter((a) => a.category === selectedCategory);
 
-  // Mock activity data for the last 7 days
-  const activityData = [
-    { day: "Mon", lessons: 3, points: 150 },
-    { day: "Tue", lessons: 2, points: 100 },
-    { day: "Wed", lessons: 4, points: 200 },
-    { day: "Thu", lessons: 1, points: 50 },
-    { day: "Fri", lessons: 3, points: 150 },
-    { day: "Sat", lessons: 5, points: 250 },
-    { day: "Sun", lessons: 2, points: 100 },
+  // Use real data if available, otherwise fall back to mock
+  const activityData = weeklyActivity.length > 0 ? weeklyActivity : [
+    { day: "Mon", date: "", lessons: 3, points: 150, minutes: 90 },
+    { day: "Tue", date: "", lessons: 2, points: 100, minutes: 60 },
+    { day: "Wed", date: "", lessons: 4, points: 200, minutes: 120 },
+    { day: "Thu", date: "", lessons: 1, points: 50, minutes: 30 },
+    { day: "Fri", date: "", lessons: 3, points: 150, minutes: 90 },
+    { day: "Sat", date: "", lessons: 5, points: 250, minutes: 150 },
+    { day: "Sun", date: "", lessons: 2, points: 100, minutes: 60 },
   ];
 
   const maxLessons = Math.max(...activityData.map((d) => d.lessons));
@@ -231,15 +288,21 @@ export default function ProgressPage() {
           <div className="grid gap-6 md:grid-cols-3">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Total Time</p>
-              <p className="text-3xl font-bold font-heading">87h</p>
+              <p className="text-3xl font-bold font-heading">
+                {timeStats ? `${Math.floor(timeStats.totalTime / 60)}h` : '87h'}
+              </p>
             </div>
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">This Week</p>
-              <p className="text-3xl font-bold font-heading text-secondary">12h</p>
+              <p className="text-3xl font-bold font-heading text-secondary">
+                {timeStats ? `${Math.floor(timeStats.thisWeek / 60)}h` : '12h'}
+              </p>
             </div>
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Avg per Day</p>
-              <p className="text-3xl font-bold font-heading text-accent">1.7h</p>
+              <p className="text-3xl font-bold font-heading text-accent">
+                {timeStats ? `${(timeStats.avgDaily / 60).toFixed(1)}h` : '1.7h'}
+              </p>
             </div>
           </div>
         </CardContent>

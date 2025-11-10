@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import Library from "./pages/Library";
@@ -16,6 +16,8 @@ import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
 import SchedulePage from "./pages/Schedule";
+import Favorited from "./pages/Favorited";
+import ProcessingContent from "./pages/ProcessingContent";
 import { AuthProvider } from "./lib/auth";
 
 const queryClient = new QueryClient();
@@ -33,6 +35,7 @@ const App = () => (
           <Route path="/auth/signin" element={<SignIn />} />
           <Route path="/auth/signup" element={<SignUp />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/processing" element={<ProcessingContent />} />
           
           {/* Protected routes with Layout */}
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
@@ -42,7 +45,8 @@ const App = () => (
           <Route path="/progress" element={<Layout><ProgressPage /></Layout>} />
           <Route path="/settings" element={<Layout><Settings /></Layout>} />
           <Route path="/schedule" element={<Layout><SchedulePage /></Layout>} />
-          <Route path="/favorites" element={<Layout><Library /></Layout>} />
+          <Route path="/favorited" element={<Layout><Favorited /></Layout>} />
+          <Route path="/favorites" element={<Navigate to="/favorited" replace />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

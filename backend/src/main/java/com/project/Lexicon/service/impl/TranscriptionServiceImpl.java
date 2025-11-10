@@ -12,6 +12,7 @@ import org.springframework.web.client.RestTemplate;
 
 import jakarta.annotation.PostConstruct;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
@@ -30,6 +31,10 @@ public class TranscriptionServiceImpl implements TranscriptionService {
     private final AtomicBoolean serviceAvailable = new AtomicBoolean(true);
     private final AtomicLong lastHealthCheck = new AtomicLong(0);
     private static final long HEALTH_CHECK_INTERVAL = 30000;
+
+    // OPTIMIZATION: Cache transcripts to avoid redundant API calls during request processing
+    private final Map<String, String> transcriptCache = new ConcurrentHashMap<>();
+    private static final int MAX_CACHE_SIZE = 50;
 
     private static final Pattern YOUTUBE_URL_PATTERN = Pattern.compile(
             "^(https?://)?(www\\.)?(youtube\\.com/watch\\?v=|youtu\\.be/)([a-zA-Z0-9_-]{11}).*$"
@@ -53,7 +58,7 @@ public class TranscriptionServiceImpl implements TranscriptionService {
             log.error("   Start: python transcript_service.py");
             log.error("═══════════════════════════════════════════");
         } else {
-            log.info("✅ Transcript service ready (3min timeout)");
+            log.info("✅ Transcript service ready (OPTIMIZED with caching, 3min timeout)");
         }
     }
 
@@ -88,6 +93,14 @@ public class TranscriptionServiceImpl implements TranscriptionService {
         }
 
         String videoId = extractVideoId(videoUrl);
+        
+        // OPTIMIZATION: Check cache first
+        if (transcriptCache.containsKey(videoId)) {
+            String cached = transcriptCache.get(videoId);
+            log.info("🎯 Cache HIT: {} ({} chars)", videoId, cached.length());
+            return cached;
+        }
+
         log.debug("📥 Transcript request: {} (patient mode)", videoId);
 
         if (!checkServiceHealth()) {
@@ -113,7 +126,15 @@ public class TranscriptionServiceImpl implements TranscriptionService {
             if (resp.getStatusCode().is2xxSuccessful() && body != null && body.containsKey("transcript")) {
                 String t = (String) body.get("transcript");
                 if (t != null && !t.isBlank()) {
-                    log.info("✅ Transcript: {} chars in {}s", t.length(), duration/1000);
+                    // OPTIMIZATION: Cache the result
+                    if (transcriptCache.size() >= MAX_CACHE_SIZE) {
+                        // Simple LRU: remove first entry
+                        String firstKey = transcriptCache.keySet().iterator().next();
+                        transcriptCache.remove(firstKey);
+                    }
+                    transcriptCache.put(videoId, t);
+                    
+                    log.info("✅ Transcript: {} chars in {}s (cached)", t.length(), duration/1000);
                     return t;
                 }
             }

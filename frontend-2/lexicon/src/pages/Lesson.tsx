@@ -110,70 +110,52 @@ export default function Lesson() {
     );
   }
 
-  const handleCompleteLesson = () => {
+  const handleCompleteLesson = async () => {
     if (!lesson) return;
     
-    // Call backend API to mark as completed
-    if (isStudyVideo) {
-      const numericId = Number(id?.replace('api-video-', ''));
-      if (!Number.isNaN(numericId)) {
-        endpoints.studyMaterials.completeVideo(numericId)
-          .then(() => {
-            // Update UI state
-            setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
-            
-            // Also save to localStorage for immediate UI feedback
-            const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
-            completedVideos[lesson.id] = {
-              completedAt: new Date().toISOString(),
-              title: lesson.title,
-              duration: lesson.duration
-            };
-            localStorage.setItem('lexigrain:completedVideos', JSON.stringify(completedVideos));
-            
-            // Dispatch custom event for same-window sync
-            window.dispatchEvent(new CustomEvent('localStorageChange', {
-              detail: { key: 'lexigrain:completedVideos' }
-            }));
-            
-            toast.success("Lesson completed! 🎉", { 
-              description: `Great job finishing "${lesson.title}"!`,
-              duration: 4000
-            });
-          })
-          .catch((err) => {
-            console.error('Failed to mark video as complete:', err);
-            
-            // Still save locally even if backend fails
-            const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
-            completedVideos[lesson.id] = {
-              completedAt: new Date().toISOString(),
-              title: lesson.title,
-              duration: lesson.duration
-            };
-            localStorage.setItem('lexigrain:completedVideos', JSON.stringify(completedVideos));
-            setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
-            
-            // Dispatch custom event for same-window sync
-            window.dispatchEvent(new CustomEvent('localStorageChange', {
-              detail: { key: 'lexigrain:completedVideos' }
-            }));
-            
-            // Show appropriate error message
-            if (err.message && err.message.includes('401')) {
-              toast.warning("Lesson completed locally", {
-                description: "Please log in to sync with the server"
-              });
-            } else {
-              toast.success("Lesson completed! 🎉", { 
-                description: "Saved locally",
-                duration: 4000
-              });
-            }
-          });
+    try {
+      // Use unified completion endpoint for both videos and lessons
+      let response;
+      
+      if (isStudyVideo) {
+        const numericId = Number(id?.replace('api-video-', ''));
+        if (!Number.isNaN(numericId)) {
+          response = await endpoints.studyMaterials.completeVideo(numericId);
+        }
+      } else {
+        // Regular lessons now have completion endpoint
+        response = await endpoints.lessons.complete(lesson.id, {
+          actualMinutes: lesson.duration
+        });
       }
-    } else {
-      // For non-video lessons, just save locally
+      
+      if (response) {
+        // Update UI state
+        setLesson({ ...lesson, progress: 100, completedAt: response.completedAt });
+        
+        // Update localStorage for offline support
+        const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
+        completedVideos[lesson.id] = {
+          completedAt: response.completedAt,
+          title: lesson.title,
+          duration: lesson.duration
+        };
+        localStorage.setItem('lexigrain:completedVideos', JSON.stringify(completedVideos));
+        
+        // Dispatch custom event for same-window sync
+        window.dispatchEvent(new CustomEvent('lessonCompleted', {
+          detail: { lessonId: lesson.id, completedAt: response.completedAt }
+        }));
+        
+        toast.success("Lesson completed! 🎉", { 
+          description: `Great job finishing "${lesson.title}"!`,
+          duration: 4000
+        });
+      }
+    } catch (err: any) {
+      console.error('Failed to mark lesson as complete:', err);
+      
+      // Still save locally even if backend fails
       const completedVideos = JSON.parse(localStorage.getItem('lexigrain:completedVideos') || '{}');
       completedVideos[lesson.id] = {
         completedAt: new Date().toISOString(),
@@ -184,14 +166,21 @@ export default function Lesson() {
       setLesson({ ...lesson, progress: 100, completedAt: new Date().toISOString() });
       
       // Dispatch custom event for same-window sync
-      window.dispatchEvent(new CustomEvent('localStorageChange', {
-        detail: { key: 'lexigrain:completedVideos' }
+      window.dispatchEvent(new CustomEvent('lessonCompleted', {
+        detail: { lessonId: lesson.id, completedAt: new Date().toISOString() }
       }));
       
-      toast.success("Lesson completed! 🎉", { 
-        description: `Great job finishing "${lesson.title}"!`,
-        duration: 4000
-      });
+      // Show appropriate error message
+      if (err.message && err.message.includes('401')) {
+        toast.warning("Lesson completed locally", {
+          description: "Please log in to sync with the server"
+        });
+      } else {
+        toast.success("Lesson completed! 🎉", { 
+          description: "Saved locally",
+          duration: 4000
+        });
+      }
     }
   };
 
@@ -224,7 +213,10 @@ export default function Lesson() {
               {lesson.title}
             </h1>
             <p className="text-lg text-muted-foreground mb-4">
-              {lesson.description}
+              {/* Show brief overview (first 2-3 sentences) instead of full description */}
+              {isStudyVideo && videoDetail?.video.summary?.content 
+                ? videoDetail.video.summary.content.split(/[.!?]+/).slice(0, 2).join('. ') + '.'
+                : lesson.description}
             </p>
             <div className="flex flex-wrap gap-2">
               {lesson.tags.map((tag) => (

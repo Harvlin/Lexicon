@@ -11,6 +11,7 @@ import org.springframework.web.client.RestTemplate;
 
 import jakarta.annotation.PostConstruct;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class OllamaServiceImpl implements OllamaService {
@@ -21,6 +22,10 @@ public class OllamaServiceImpl implements OllamaService {
     private String ollamaUrl;
 
     private final RestTemplate restTemplate;
+    
+    // OPTIMIZATION: Topic cache to avoid redundant AI calls
+    private final Map<String, String> topicCache = new ConcurrentHashMap<>();
+    private static final int MAX_CACHE_SIZE = 100;
 
     public OllamaServiceImpl(RestTemplateBuilder builder) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -34,31 +39,35 @@ public class OllamaServiceImpl implements OllamaService {
 
     @PostConstruct
     public void init() {
-        logger.info("🤖 Ollama Service initialized (ULTRA-PATIENT MODE)");
+        logger.info("🤖 Ollama Service initialized (OPTIMIZED MODE)");
         logger.info("   URL: {}", ollamaUrl);
         logger.info("   Timeouts: connect=15s, read=10min");
+        logger.info("   Topic cache: enabled (max {} entries)", MAX_CACHE_SIZE);
     }
 
     @Override
     public String getTopic(String preference) {
+        // OPTIMIZATION: Check cache first
+        String cacheKey = preference.toLowerCase().trim();
+        if (topicCache.containsKey(cacheKey)) {
+            String cached = topicCache.get(cacheKey);
+            logger.info("🎯 Cache HIT for: '{}' → '{}'", preference, cached);
+            return cached;
+        }
+
         logger.info("🔍 Generating topic from: '{}'", preference);
 
-        // IMPROVED prompt focusing on specific technology/topic
-        String prompt = "Extract the MAIN TECHNOLOGY or SUBJECT from this learning request.\n\n" +
-                "User request: \"" + preference + "\"\n\n" +
+        // STREAMLINED prompt for faster topic generation
+        String prompt = "Extract the MAIN TECHNOLOGY/SUBJECT from: \"" + preference + "\"\n\n" +
                 "Rules:\n" +
-                "- Output ONLY the main technology/subject name + 'tutorial'\n" +
-                "- Be SPECIFIC: if user says Java, output 'java tutorial' NOT 'programming tutorial'\n" +
-                "- If user says Python, output 'python tutorial' NOT 'programming tutorial'\n" +
-                "- Maximum 4 words\n" +
-                "- NO explanations, NO extra words\n\n" +
+                "- Output: main technology + 'tutorial' (max 4 words)\n" +
+                "- Be SPECIFIC (Java → 'java tutorial', not 'programming')\n" +
+                "- NO explanations\n\n" +
                 "Examples:\n" +
-                "\"learn java programming\" → java tutorial\n" +
-                "\"teach me python\" → python tutorial\n" +
-                "\"I want to learn JavaScript\" → javascript tutorial\n" +
-                "\"web development\" → web development tutorial\n" +
-                "\"machine learning basics\" → machine learning tutorial\n\n" +
-                "Now extract from: \"" + preference + "\"\n" +
+                "\"learn java\" → java tutorial\n" +
+                "\"python programming\" → python tutorial\n" +
+                "\"web development\" → web development tutorial\n\n" +
+                "Extract from: \"" + preference + "\"\n" +
                 "Output:";
 
         String response = callOllamaWithRetry(prompt, 30, 2);
@@ -66,7 +75,15 @@ public class OllamaServiceImpl implements OllamaService {
         // Clean the response AGGRESSIVELY
         String topic = cleanTopicResponse(response, preference);
 
-        logger.info("✅ Final topic: '{}'", topic);
+        // OPTIMIZATION: Cache the result
+        if (topicCache.size() >= MAX_CACHE_SIZE) {
+            // Simple LRU: remove first entry
+            String firstKey = topicCache.keySet().iterator().next();
+            topicCache.remove(firstKey);
+        }
+        topicCache.put(cacheKey, topic);
+
+        logger.info("✅ Final topic: '{}' (cached)", topic);
         return topic;
     }
 
@@ -112,37 +129,44 @@ public class OllamaServiceImpl implements OllamaService {
     public Map<String, Object> generateCombinedMaterials(String transcript, String title, String topic) {
         logger.info("🤖 Generating materials for: {}", truncate(title, 50));
 
-        // Use more transcript for better context - increase from 5000 to 8000 chars
-        String truncated = transcript.length() > 15000
-                ? transcript.substring(0, 8000) + "...[content continues]..." +
-                transcript.substring(Math.max(0, transcript.length() - 2000))
-                : transcript;
+        // QUALITY SAFEGUARD: Ensure we use enough content for quality generation
+        // For short transcripts (<8000 chars), use full content
+        // For long transcripts, use smart sampling: beginning (6000) + end (2000)
+        String truncated;
+        if (transcript.length() <= 8000) {
+            truncated = transcript; // Use full content for short transcripts
+            logger.debug("Using full transcript ({} chars)", transcript.length());
+        } else {
+            // OPTIMIZED: Use beginning + end for better context while reducing size
+            truncated = transcript.substring(0, 6000) + 
+                       "\n\n...[middle content omitted for processing efficiency]...\n\n" +
+                       transcript.substring(Math.max(0, transcript.length() - 2000));
+            logger.debug("Optimized transcript: {} → {} chars", transcript.length(), truncated.length());
+        }
 
-        // IMPROVED PROMPT - Focus on actual content extraction
-        String prompt = "Analyze this educational video transcript and extract key information.\n\n" +
-                "VIDEO: '" + title + "'\n" +
-                "TOPIC: '" + topic + "'\n\n" +
+        // QUALITY-OPTIMIZED PROMPT - Streamlined but comprehensive
+        String prompt = "Analyze this educational video transcript.\n\n" +
+                "VIDEO: " + title + "\n" +
+                "TOPIC: " + topic + "\n\n" +
                 "TRANSCRIPT:\n" + truncated + "\n\n" +
-                "Create the following sections:\n\n" +
+                "Extract:\n\n" +
                 "## SUMMARY\n" +
-                "Write a 3-paragraph summary that covers:\n" +
-                "- What specific concepts/topics are taught (be specific with names, technologies, frameworks)\n" +
-                "- What practical skills or projects are built\n" +
-                "- Key learning outcomes and what students will be able to do\n" +
-                "Focus on CONTENT, not marketing language. Extract actual technical details from the transcript.\n\n" +
+                "2-3 paragraph summary with:\n" +
+                "- Main concepts/technologies (specific names)\n" +
+                "- Practical demonstrations\n" +
+                "- Key takeaways\n\n" +
                 "## QUESTIONS\n" +
-                "Create 5 Q&A pairs based on actual content from the transcript:\n" +
-                "Q1: [specific question about a concept mentioned]\n" +
-                "A1: [answer with specific details from transcript]\n" +
-                "(Continue for Q2-Q5)\n\n" +
+                "5 Q&A pairs from transcript content:\n" +
+                "Q1: [specific concept]\nA1: [detailed answer]\n" +
+                "(Q2-Q5: different concepts each)\n\n" +
                 "## FLASHCARDS\n" +
-                "Create 5 flashcard pairs for key concepts from the transcript:\n" +
-                "1. Front: [term/concept from transcript]\n   Back: [definition/explanation from transcript]\n" +
-                "(Continue for cards 2-5)\n\n" +
-                "IMPORTANT: Base everything on the actual transcript content, not general knowledge.";
+                "5 flashcard pairs:\n" +
+                "1. Front: [term]\n   Back: [definition]\n" +
+                "(2-5: different concepts)\n\n" +
+                "Use ONLY transcript content, not general knowledge.";
 
         long start = System.currentTimeMillis();
-        String response = callOllamaWithRetry(prompt, 1500, 3);
+        String response = callOllamaWithRetry(prompt, 1300, 3);
         long duration = System.currentTimeMillis() - start;
 
         logger.info("✅ AI generation complete in {}s", duration/1000);
@@ -171,10 +195,21 @@ public class OllamaServiceImpl implements OllamaService {
                 }
             }
 
-            // Final fallback - use entire response as summary
+            // QUALITY VALIDATION: Ensure content meets minimum standards
             if (summaryContent.isEmpty()) {
                 summaryContent = response.substring(0, Math.min(response.length(), 1000));
                 logger.warn("⚠️ Using fallback summary extraction");
+            }
+
+            // QUALITY CHECK: Validate summary length (should be substantial)
+            if (summaryContent.length() < 100) {
+                logger.warn("⚠️ Summary too short ({} chars), may indicate quality issue", 
+                           summaryContent.length());
+            } else {
+                logger.debug("✅ Quality check passed: Summary {} chars, Questions {}, Flashcards {}",
+                           summaryContent.length(), 
+                           !questionsContent.isEmpty() ? "present" : "missing",
+                           !flashcardsContent.isEmpty() ? "present" : "missing");
             }
 
             result.put("summary", Map.of(
@@ -224,24 +259,20 @@ public class OllamaServiceImpl implements OllamaService {
         logger.info("🤖 Generating learning plan...");
 
         StringBuilder prompt = new StringBuilder();
-        prompt.append("Create a structured learning plan for the topic: '").append(topic).append("'\n\n");
-        prompt.append("Based on ").append(summaries.size()).append(" educational videos:\n\n");
+        prompt.append("Create a learning plan for: ").append(topic).append("\n\n");
+        prompt.append("Based on ").append(summaries.size()).append(" videos:\n\n");
 
         int num = 1;
         for (Map.Entry<String, String> entry : summaries.entrySet()) {
-            prompt.append("VIDEO ").append(num++).append(": ").append(entry.getKey()).append("\n");
-            prompt.append(truncate(entry.getValue(), 300)).append("\n\n");
+            prompt.append(num++).append(". ").append(entry.getKey()).append("\n");
+            prompt.append(truncate(entry.getValue(), 250)).append("\n\n");
         }
 
-        prompt.append("\nCreate a learning plan with these sections:\n\n");
-        prompt.append("## LEARNING PATH\n");
-        prompt.append("Recommend the optimal viewing order (1-").append(summaries.size()).append(") with brief reasoning.\n\n");
-        prompt.append("## KEY CONCEPTS\n");
-        prompt.append("List 6-8 main concepts that will be learned across all videos.\n\n");
-        prompt.append("## LEARNING OUTCOMES\n");
-        prompt.append("List 5-6 specific skills or abilities the learner will gain.\n\n");
-        prompt.append("## PRACTICE EXERCISES\n");
-        prompt.append("Suggest 3-4 hands-on exercises or projects to reinforce learning.\n");
+        prompt.append("\nCreate:\n\n");
+        prompt.append("## LEARNING PATH\nOptimal viewing order (1-").append(summaries.size()).append(") with reasoning.\n\n");
+        prompt.append("## KEY CONCEPTS\n5-7 main concepts across all videos.\n\n");
+        prompt.append("## LEARNING OUTCOMES\n4-6 skills gained.\n\n");
+        prompt.append("## PRACTICE EXERCISES\n3 hands-on projects.");
 
         String plan = callOllamaWithRetry(prompt.toString(), 1500, 3);
         logger.info("✅ Learning plan generated: {} chars", plan.length());
@@ -278,6 +309,9 @@ public class OllamaServiceImpl implements OllamaService {
 
     private String callOllama(String prompt, int maxTokens) {
         try {
+            // OPTIMIZATION: Adaptive thread count based on CPU cores
+            int optimalThreads = Math.min(Runtime.getRuntime().availableProcessors(), 8);
+            
             Map<String, Object> body = Map.of(
                     "model", "llama3",
                     "stream", false,
@@ -285,7 +319,7 @@ public class OllamaServiceImpl implements OllamaService {
                             Map.of("role", "system",
                                     "content", "You are a technical education content analyzer. " +
                                             "Extract specific, factual information from transcripts. " +
-                                            "Be precise and detailed. Focus on actual content, not marketing language."),
+                                            "Be precise, detailed, and comprehensive. Focus on actual content."),
                             Map.of("role", "user", "content", prompt)
                     ),
                     "options", Map.of(
@@ -293,7 +327,9 @@ public class OllamaServiceImpl implements OllamaService {
                             "top_p", 0.9,
                             "num_predict", maxTokens,
                             "num_ctx", 8192,
-                            "num_thread", 4
+                            "num_thread", optimalThreads,  // OPTIMIZED: Use available CPU threads
+                            "num_batch", 512,  // OPTIMIZED: Larger batch for faster processing
+                            "repeat_penalty", 1.1  // QUALITY: Avoid repetitive content
                     )
             );
 

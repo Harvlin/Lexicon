@@ -1,12 +1,15 @@
 package com.project.Lexicon.service.impl;
 
+import com.project.Lexicon.domain.ProgressStatus;
 import com.project.Lexicon.domain.ScheduleSource;
 import com.project.Lexicon.domain.SessionStatus;
 import com.project.Lexicon.domain.entity.Lesson;
+import com.project.Lexicon.domain.entity.Progress;
 import com.project.Lexicon.domain.entity.ScheduleSession;
 import com.project.Lexicon.domain.entity.ScheduleWeek;
 import com.project.Lexicon.domain.entity.User;
 import com.project.Lexicon.repository.LessonRepository;
+import com.project.Lexicon.repository.ProgressRepository;
 import com.project.Lexicon.repository.ScheduleWeekRepository;
 import com.project.Lexicon.service.ScheduleService;
 import jakarta.persistence.EntityNotFoundException;
@@ -27,12 +30,15 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     private final ScheduleWeekRepository scheduleWeekRepository;
     private final LessonRepository lessonRepository;
+    private final ProgressRepository progressRepository;
 
     @Autowired
     public ScheduleServiceImpl(ScheduleWeekRepository scheduleWeekRepository,
-                               LessonRepository lessonRepository) {
+                               LessonRepository lessonRepository,
+                               ProgressRepository progressRepository) {
         this.scheduleWeekRepository = scheduleWeekRepository;
         this.lessonRepository = lessonRepository;
+        this.progressRepository = progressRepository;
     }
 
     @Override
@@ -156,6 +162,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .orElseThrow(() -> new EntityNotFoundException("Session not found: " + sessionId));
 
         // 3. Apply partial updates
+        SessionStatus oldStatus = session.getStatus();
+        
         if (patch.containsKey("status")) {
             String statusStr = (String) patch.get("status");
             session.setStatus(SessionStatus.valueOf(statusStr.toUpperCase()));
@@ -183,6 +191,11 @@ public class ScheduleServiceImpl implements ScheduleService {
             Lesson lesson = lessonRepository.findById(lessonId)
                     .orElseThrow(() -> new EntityNotFoundException("Lesson not found: " + lessonId));
             session.setLesson(lesson);
+        }
+
+        // 3.5. If session status changed to DONE, create/update Progress record
+        if (session.getStatus() == SessionStatus.DONE && oldStatus != SessionStatus.DONE) {
+            createOrUpdateProgress(user, session);
         }
 
         // 4. Update timestamps
@@ -275,6 +288,36 @@ public class ScheduleServiceImpl implements ScheduleService {
             return Long.parseLong(lessonIdStr.substring(7));
         }
         return Long.parseLong(lessonIdStr);
+    }
+
+    /**
+     * Create or update Progress record when a schedule session is marked as DONE
+     */
+    private void createOrUpdateProgress(User user, ScheduleSession session) {
+        if (session.getLesson() == null) {
+            log.warn("Cannot create progress for session without lesson");
+            return;
+        }
+
+        Long lessonId = session.getLesson().getId();
+        
+        // Find or create Progress
+        Progress progress = progressRepository.findByUserAndLesson_Id(user, lessonId)
+                .orElse(Progress.builder()
+                        .user(user)
+                        .lesson(session.getLesson())
+                        .progressPercent(0)
+                        .build());
+
+        // Mark as completed
+        progress.setStatus(ProgressStatus.COMPLETED);
+        progress.setCompletedAt(Instant.now());
+        progress.setProgressPercent(100);
+
+        progressRepository.save(progress);
+        
+        log.info("Created/updated Progress record for user {} lesson {} from schedule session", 
+                 user.getEmail(), lessonId);
     }
 
     private Map<String, Object> mapWeekToDto(ScheduleWeek week) {

@@ -1,8 +1,12 @@
 package com.project.Lexicon.controller;
 
+import com.project.Lexicon.domain.ProgressStatus;
 import com.project.Lexicon.domain.entity.Lesson;
 import com.project.Lexicon.domain.entity.Progress;
 import com.project.Lexicon.domain.entity.User;
+import com.project.Lexicon.domain.entity.UserFavorite;
+import com.project.Lexicon.repository.ProgressRepository;
+import com.project.Lexicon.repository.UserFavoriteRepository;
 import com.project.Lexicon.service.LessonService;
 import com.project.Lexicon.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -12,9 +16,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -26,6 +32,8 @@ public class LessonController {
 
     private final LessonService lessonService;
     private final UserService userService;
+    private final ProgressRepository progressRepository;
+    private final UserFavoriteRepository userFavoriteRepository;
 
     @GetMapping({"", "/list"})
     public ResponseEntity<?> getAllLessons(
@@ -60,7 +68,7 @@ public class LessonController {
                 lessonsList = lessonService.getAllLessons()
                         .stream()
                         .limit(limit)
-                        .map(this::lessonToMap)
+                        .map(lesson -> lessonToMapWithUser(lesson, user))
                         .collect(Collectors.toList());
             }
 
@@ -90,11 +98,150 @@ public class LessonController {
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
-                    "lesson", lessonToMap(lesson)
+                    "lesson", lessonToMapWithUser(lesson, user)
             ));
 
         } catch (Exception e) {
             log.error("Failed to get lesson {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Mark a lesson as completed
+     * Creates or updates Progress record with COMPLETED status
+     */
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<?> completeLesson(
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, Object> body,
+            Authentication authentication) {
+
+        try {
+            User user = getAuthenticatedUser(authentication);
+            Long lessonId = Long.parseLong(id);
+            
+            log.info("User {} marking lesson {} as completed", user.getEmail(), lessonId);
+            
+            Lesson lesson = lessonService.getLesson(lessonId);
+            
+            // Find or create Progress
+            Progress progress = progressRepository.findByUserAndLesson_Id(user, lessonId)
+                    .orElse(Progress.builder()
+                            .user(user)
+                            .lesson(lesson)
+                            .progressPercent(0)
+                            .build());
+            
+            progress.setStatus(ProgressStatus.COMPLETED);
+            progress.setCompletedAt(Instant.now());
+            progress.setProgressPercent(100);
+            
+            progressRepository.save(progress);
+            
+            log.info("Lesson {} marked as completed for user {}", lessonId, user.getEmail());
+            
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "lessonId", lessonId,
+                    "completedAt", progress.getCompletedAt().toString(),
+                    "message", "Lesson marked as completed"
+            ));
+
+        } catch (NumberFormatException e) {
+            log.error("Invalid lesson ID format: {}", id);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message", "Invalid lesson ID"));
+        } catch (Exception e) {
+            log.error("Failed to complete lesson {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Toggle favorite status for a lesson
+     */
+    @PostMapping("/{id}/favorite")
+    public ResponseEntity<?> toggleFavorite(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        try {
+            User user = getAuthenticatedUser(authentication);
+            Long lessonId = Long.parseLong(id);
+            
+            log.info("User {} toggling favorite for lesson {}", user.getEmail(), lessonId);
+            
+            Lesson lesson = lessonService.getLesson(lessonId);
+            
+            // Check if already favorited
+            Optional<UserFavorite> existing = userFavoriteRepository.findByUserAndLesson_Id(user, lessonId);
+            
+            boolean isFavorite;
+            if (existing.isPresent()) {
+                // Remove from favorites
+                userFavoriteRepository.delete(existing.get());
+                isFavorite = false;
+                log.info("Removed lesson {} from favorites for user {}", lessonId, user.getEmail());
+            } else {
+                // Add to favorites
+                UserFavorite favorite = UserFavorite.builder()
+                        .user(user)
+                        .lesson(lesson)
+                        .build();
+                userFavoriteRepository.save(favorite);
+                isFavorite = true;
+                log.info("Added lesson {} to favorites for user {}", lessonId, user.getEmail());
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "lessonId", lessonId,
+                    "isFavorite", isFavorite
+            ));
+
+        } catch (NumberFormatException e) {
+            log.error("Invalid lesson ID format: {}", id);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message", "Invalid lesson ID"));
+        } catch (Exception e) {
+            log.error("Failed to toggle favorite for lesson {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Get all favorited lessons for the current user
+     */
+    @GetMapping("/favorited")
+    public ResponseEntity<?> getFavoritedLessons(Authentication authentication) {
+        try {
+            User user = getAuthenticatedUser(authentication);
+            log.info("User {} fetching favorited lessons", user.getEmail());
+            
+            List<UserFavorite> favorites = userFavoriteRepository.findAllByUserWithDetails(user);
+            
+            List<Map<String, Object>> favoritedLessons = favorites.stream()
+                    .filter(f -> f.getLesson() != null)
+                    .map(f -> {
+                        Map<String, Object> map = lessonToMap(f.getLesson());
+                        map.put("isFavorite", true);
+                        map.put("favoritedAt", f.getFavoritedAt());
+                        return map;
+                    })
+                    .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "count", favoritedLessons.size(),
+                    "items", favoritedLessons
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to get favorited lessons: {}", e.getMessage(), e);
             return ResponseEntity.badRequest()
                     .body(Map.of("status", "error", "message", e.getMessage()));
         }
@@ -121,6 +268,12 @@ public class LessonController {
     }
 
     private Map<String, Object> lessonToMap(Lesson lesson) {
+        // Note: This basic version doesn't check favorites
+        // Use lessonToMapWithUser for favorite checking
+        return lessonToMapWithUser(lesson, null);
+    }
+    
+    private Map<String, Object> lessonToMapWithUser(Lesson lesson, User user) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", String.valueOf(lesson.getId())); // Frontend expects string ID
         map.put("title", lesson.getTitle());
@@ -143,9 +296,22 @@ public class LessonController {
         map.put("createdAt", lesson.getCreatedAt());
         map.put("updatedAt", lesson.getUpdatedAt());
         
-        // Additional fields frontend might expect
-        map.put("isFavorite", false); // TODO: Implement favorite check if needed
-        map.put("progress", 0); // TODO: Implement progress tracking if needed
+        // Check if favorited by user
+        boolean isFavorite = false;
+        if (user != null) {
+            isFavorite = userFavoriteRepository.findByUserAndLesson_Id(user, lesson.getId()).isPresent();
+        }
+        map.put("isFavorite", isFavorite);
+        
+        // Check progress
+        int progress = 0;
+        if (user != null) {
+            Optional<Progress> progressOpt = progressRepository.findByUserAndLesson_Id(user, lesson.getId());
+            if (progressOpt.isPresent()) {
+                progress = progressOpt.get().getProgressPercent() != null ? progressOpt.get().getProgressPercent() : 0;
+            }
+        }
+        map.put("progress", progress);
         
         return map;
     }

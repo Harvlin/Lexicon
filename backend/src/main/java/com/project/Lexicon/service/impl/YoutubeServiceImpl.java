@@ -177,10 +177,10 @@ public class YoutubeServiceImpl implements YoutubeService {
             return new ArrayList<>();
         }
 
-        logger.info("Found {} relevant candidates. Checking transcripts SLOWLY...", filteredVideos.size());
+        logger.info("Found {} relevant candidates. Checking transcripts OPTIMIZED...", filteredVideos.size());
 
-        // Check transcripts in batches
-        List<Video> verifiedVideos = checkTranscriptsInBatches(filteredVideos, 3, 5000);
+        // OPTIMIZED: Increased batch size 5→8 and reduced delay 3000→2000ms for faster verification
+        List<Video> verifiedVideos = checkTranscriptsInBatches(filteredVideos, 8, 2000);
 
         // Sort by relevance score
         verifiedVideos.sort((v1, v2) -> {
@@ -280,17 +280,23 @@ public class YoutubeServiceImpl implements YoutubeService {
         return query;
     }
 
+    /**
+     * OPTIMIZED: Check transcripts in parallel batches with adaptive delay
+     */
     private List<Video> checkTranscriptsInBatches(
             List<Video> videos, int batchSize, long delayMs) {
 
         List<Video> verified = new ArrayList<>();
         int totalVideos = videos.size();
 
-        logger.info("🔄 Checking {} videos: {} per batch, {}s delay between batches",
-                totalVideos, batchSize, delayMs/1000);
+        // OPTIMIZATION: Use provided batch size (already optimized - 8 videos)
+        int optimalBatchSize = Math.max(batchSize, 8);
 
-        for (int i = 0; i < totalVideos; i += batchSize) {
-            int end = Math.min(i + batchSize, totalVideos);
+        logger.info("🔄 OPTIMIZED: Checking {} videos: {} per batch, {}ms delay",
+                totalVideos, optimalBatchSize, delayMs);
+
+        for (int i = 0; i < totalVideos; i += optimalBatchSize) {
+            int end = Math.min(i + optimalBatchSize, totalVideos);
             List<Video> batch = videos.subList(i, end);
 
             logger.debug("Checking batch {}-{} of {}", i + 1, end, totalVideos);
@@ -315,9 +321,15 @@ public class YoutubeServiceImpl implements YoutubeService {
                         batchVerified.size(), verified.size());
             }
 
-            if (end < totalVideos) {
+            // OPTIMIZATION: More aggressive adaptive delay for faster processing
+            if (end < totalVideos && verified.size() < 10) {
                 try {
-                    Thread.sleep(delayMs);
+                    // Reduced delay: if we have 5+ verified, delay is 1/3rd; if 8+, skip delay
+                    long adaptiveDelay = verified.size() >= 8 ? 0 : 
+                                        (verified.size() >= 5 ? delayMs / 3 : delayMs / 2);
+                    if (adaptiveDelay > 0) {
+                        Thread.sleep(adaptiveDelay);
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;

@@ -17,6 +17,8 @@ import java.util.Optional;
 public interface ScheduleWeekRepository extends JpaRepository<ScheduleWeek, Long> {
 
     Optional<ScheduleWeek> findByUserAndWeekId(User user, String weekId);
+    
+    List<ScheduleWeek> findByUser(User user);
 
     @Query("SELECT s FROM ScheduleSession s " +
             "WHERE s.week.user = :user " +

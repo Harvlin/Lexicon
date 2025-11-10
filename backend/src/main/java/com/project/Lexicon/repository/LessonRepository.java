@@ -6,5 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface LessonRepository extends JpaRepository<Lesson, Long> {
-    Long countTotalLesson();
+    // Built-in count() method from JpaRepository is sufficient
 }

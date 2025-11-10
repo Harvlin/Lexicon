@@ -24,12 +24,16 @@ export default function SignIn() {
     const form = e.currentTarget;
     const email = (form.elements.namedItem("email") as HTMLInputElement)?.value;
     const password = (form.elements.namedItem("password") as HTMLInputElement)?.value;
+    
+    let shouldProcessContent = false;
+    
     try {
       const res = await endpoints.auth.login({ email, password });
-  const token = res.token || (res as any).accessToken;
+      const token = res.token || (res as any).accessToken;
       if (token) setAuthToken(token);
-  // Immediately hydrate global user from backend
-  await refresh();
+      // Immediately hydrate global user from backend
+      await refresh();
+      
       // If user had onboarding saved locally (from pre-auth onboarding), sync it now
       try {
         const raw = localStorage.getItem("lexigrain:onboarding");
@@ -71,14 +75,27 @@ export default function SignIn() {
             // Keep local copy to support components that read onboarding from localStorage
             localStorage.setItem("lexigrain:onboarding", JSON.stringify(payload));
             toast.success("Onboarding synced to your account");
+            
+            // Check if we need to process content
+            const pendingPref = localStorage.getItem('lexigrain:pendingPreference');
+            if (pendingPref) {
+              shouldProcessContent = true;
+            }
           } catch (err) {
             // keep local copy; surface a gentle hint
-            toast.message("We’ll sync your onboarding once you’re online.");
+            toast.message("We'll sync your onboarding once you're online.");
           }
         }
       } catch {}
+      
       toast.success("Welcome back!");
-      navigate("/");
+      
+      // If there's pending content processing, go to processing page
+      if (shouldProcessContent) {
+        navigate("/processing", { replace: true });
+      } else {
+        navigate("/");
+      }
     } catch (err: any) {
       toast.error(err?.message || "Invalid email or password");
     } finally {
