@@ -137,6 +137,7 @@ export interface AuthResponseDTO {
   email?: string;
   role?: string;
   goals?: string;          // comma-separated backend format
+  avatarUrl?: string;      // user's profile picture URL
 }
 
 export interface MessageResponseDTO {

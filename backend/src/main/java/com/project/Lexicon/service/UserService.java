@@ -10,4 +10,5 @@ public interface UserService {
     Optional<User> currentUser();
     Optional<User> findByName(String name);
     Optional<User> findByEmail(String email);
+    User updateAvatar(String avatarUrl);
 }

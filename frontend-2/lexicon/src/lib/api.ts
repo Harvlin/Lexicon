@@ -124,10 +124,12 @@ export const endpoints = {
       // Prefer flattened fields, fallback to nested user
       const name = auth.name || auth.user?.name || "";
       const email = auth.email || auth.user?.email || "";
-      return { name, email } as UserDTO;
+      const avatar = auth.avatarUrl || auth.user?.avatar || "";
+      return { name, email, avatar } as UserDTO;
     },
     // Placeholder: if backend later exposes profile update endpoint, point this there
     update: (data: Partial<UserDTO>) => api.put<UserDTO>(`/me`, data),
+    updateAvatar: (avatarUrl: string) => api.patch<{ status: string; message: string; avatarUrl: string }>(`/users/me/avatar`, { avatarUrl }),
   },
   progress: {
     summary: () => api.get<UserProgressSummaryDTO>(`/progress/summary`),

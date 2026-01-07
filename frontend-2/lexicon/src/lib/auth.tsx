@@ -8,6 +8,7 @@ type AuthState = {
   refresh: () => Promise<void>;
   setUser: (u: UserDTO | null) => void;
   logout: () => void;
+  updateAvatar: (avatarUrl: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const next: UserDTO = {
         name: me.name || me.user?.name || user?.name || "",
         email: me.email || me.user?.email || user?.email || "",
-        avatar: user?.avatar,
+        avatar: me.avatarUrl || me.user?.avatar || user?.avatar,
         joinedDate: user?.joinedDate,
       };
       setUser(next);
@@ -77,7 +78,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
   };
 
-  const value = useMemo(() => ({ user, setUser, loading, refresh, logout }), [user, loading]);
+  const updateAvatar = async (avatarUrl: string) => {
+    await endpoints.me.updateAvatar(avatarUrl);
+    if (user) {
+      const next = { ...user, avatar: avatarUrl };
+      setUser(next);
+      try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(next)); } catch {}
+    }
+  };
+
+  const value = useMemo(() => ({ user, setUser, loading, refresh, logout, updateAvatar }), [user, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

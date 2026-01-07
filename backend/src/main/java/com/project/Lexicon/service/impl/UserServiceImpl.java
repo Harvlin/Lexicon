@@ -65,4 +65,12 @@ public class UserServiceImpl implements UserService {
             return Optional.empty();
         }
     }
+
+    @Override
+    public User updateAvatar(String avatarUrl) {
+        User user = requireCurrentUser();
+        user.setAvatarUrl(avatarUrl);
+        user.setUpdatedAt(java.time.LocalDateTime.now());
+        return userRepository.save(user);
+    }
 }

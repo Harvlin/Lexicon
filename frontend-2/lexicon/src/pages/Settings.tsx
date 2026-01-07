@@ -24,10 +24,11 @@ import { mockUser } from "@/lib/mockData";
 import { endpoints } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { UserDTO, NotificationPrefsDTO } from "@/lib/types";
+import { ProfilePictureSelector } from "@/components/profile/ProfilePictureSelector";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser, logout, updateAvatar } = useAuth();
   const [user, setUser] = useState<UserDTO | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -39,6 +40,7 @@ export default function Settings() {
   const [pushNotifications, setPushNotifications] = useState(true);
   const [weeklyDigest, setWeeklyDigest] = useState(false);
   const [marketingEmails, setMarketingEmails] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   useEffect(() => {
     if (authUser) {
@@ -170,15 +172,26 @@ export default function Settings() {
                   <AvatarFallback className="text-2xl">SJ</AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className="gap-2" onClick={() => setShowAvatarPicker(true)}>
                     <Camera className="h-4 w-4" />
                     Change Photo
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                    JPG, PNG or GIF. Max size 2MB.
+                    Select from available avatars
                   </p>
                 </div>
               </div>
+
+              <ProfilePictureSelector
+                open={showAvatarPicker}
+                onOpenChange={setShowAvatarPicker}
+                currentAvatar={user?.avatar}
+                onSelect={async (avatarUrl) => {
+                  await updateAvatar(avatarUrl);
+                  setUser((prev) => prev ? { ...prev, avatar: avatarUrl } : prev);
+                  toast.success("Profile picture updated!");
+                }}
+              />
 
               <Separator />
 

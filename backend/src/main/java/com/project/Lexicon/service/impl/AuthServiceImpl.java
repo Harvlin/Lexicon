@@ -87,7 +87,8 @@ public class AuthServiceImpl implements AuthService {
                     user.getName(),
                     user.getEmail(),
                     user.getRole(),
-                    String.join(",", user.getGoals())
+                    String.join(",", user.getGoals()),
+                    user.getAvatarUrl()
             );
         } catch (AuthenticationException e) {
             log.warn("Login failed for {}: {}", dto.getEmail(), e.getMessage());
@@ -106,7 +107,8 @@ public class AuthServiceImpl implements AuthService {
                 user.getName(),
                 user.getEmail(),
                 user.getRole(),
-                String.join(",", user.getGoals())
+                String.join(",", user.getGoals()),
+                user.getAvatarUrl()
         );
     }
 

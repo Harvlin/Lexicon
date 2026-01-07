@@ -9,12 +9,14 @@ import { Link } from "react-router-dom";
 import { endpoints, fetchWithFallback } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { UserDTO, UserProgressSummaryDTO, OnboardingDTO } from "@/lib/types";
+import { ProfilePictureSelector } from "@/components/profile/ProfilePictureSelector";
 
 export default function Profile() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, updateAvatar } = useAuth();
   const [user, setUser] = useState<UserDTO | null>(authUser);
   const [progress, setProgress] = useState<UserProgressSummaryDTO | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingDTO | null>(null);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   // share the same storage key as Onboarding page for robust offline fallback
   const STORAGE_KEY = "lexigrain:onboarding";
@@ -148,10 +150,21 @@ export default function Profile() {
                 size="icon"
                 variant="secondary"
                 className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-medium"
+                onClick={() => setShowAvatarPicker(true)}
               >
                 <Edit className="h-4 w-4" />
               </Button>
             </div>
+
+            <ProfilePictureSelector
+              open={showAvatarPicker}
+              onOpenChange={setShowAvatarPicker}
+              currentAvatar={user?.avatar}
+              onSelect={async (avatarUrl) => {
+                await updateAvatar(avatarUrl);
+                setUser((prev) => prev ? { ...prev, avatar: avatarUrl } : prev);
+              }}
+            />
 
             <div className="flex-1 text-center md:text-left space-y-4">
               <div>
