@@ -24,7 +24,7 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/register")
-    @RateLimit(key = "register", limit = 5, duration = 300) // 5 attempts per 5 minutes
+    @RateLimit(key = "register", limit = 10, duration = 60) // 10 attempts per minute
     public ResponseEntity<?> register(@Valid @RequestBody RegisterDto dto) {
         try {
             String result = authService.register(dto);
@@ -47,7 +47,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @RateLimit(key = "login", limit = 5, duration = 600) // 5 attempts per 5 minutes
+    @RateLimit(key = "login", limit = 10, duration = 60) // 10 attempts per minute
     public ResponseEntity<?> login(@Valid @RequestBody LoginDto dto) {
         try {
             AuthResponse response = authService.login(dto);

@@ -22,9 +22,3 @@ services:
       - "11434:11434"
     volumes:
       - ./ollama:/root/.ollama
-  vosk:
-    image: alphacep/kaldi-en:latest
-    container_name: vosk-server
-    restart: always
-    ports:
-      - "2700:2700"
